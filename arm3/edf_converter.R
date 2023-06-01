@@ -1,12 +1,23 @@
 # install.packages("eyelinkReader")
 library(eyelinkReader)
 
-directory <- "/Users/goldlab/Documents/Ishan_summer23/test_runs/arm3"
-filename <- "ARM3_ET_2023_05_31_14_05.EDF"
-setwd(directory)
-gaze <- read_edf(filename)
+results_path <- "/Users/goldlab/Documents/Ishan_summer23/test_runs/arm3/results/"
+run_path <- "2023_06_01_14_15"
+filename <- "ARM3_ET.EDF"
+setwd(paste(results_path,run_path,sep=""))
+gaze <- read_edf(filename, import_samples=TRUE)
+
+if (!dir.exists("csv")){
+  dir.create("csv")
+}else{
+  print("dir 'csv' exists")
+}
+
+setwd("csv")
+varnames <- names(gaze)
+
+for (i in 1:length(gaze)) {
+  write.csv(gaze[i], paste(varnames[i],".csv", sep=""))
+}
 
 
-View(gaze$saccades)
-plot(gaze, trial = 1, show_fixations = TRUE, show_saccades = TRUE)
-plot(gaze, trial = NULL, show_fixations = TRUE, show_saccades = FALSE)
