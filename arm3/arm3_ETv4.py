@@ -26,7 +26,7 @@ WINDOW = 5; TRIALS = WINDOW*5
 DRIFT = 1; SIG = 5; REWARD = 3; PUNISH = -1; Q = 0.6
 
 memory_mode = True
-dummy_mode = True
+dummy_mode = False
 full_screen = False
 use_retina = False
 edf_fname = 'ARM3_ET'
@@ -121,6 +121,16 @@ except RuntimeError as err:
         el_tracker.close()
     core.quit()
     sys.exit()
+    
+    
+    
+# calibrate timings
+pre_time = core.getTime()
+el_tracker.sendMessage('time test')
+wait(1)
+m = el_tracker.getLastMessage()
+time_elapsed = core.getTime() - pre_time
+print(time_elapsed, m)
 
 # Add a header text to the EDF file to identify the current experiment name
 # This is OPTIONAL. If your text starts with "RECORDED BY " it will be
@@ -252,7 +262,7 @@ if use_retina:
 pylink.openGraphicsEx(genv)
 
 
-# define a few helper functions for trial handling
+
 
 
 def clear(win):
@@ -385,7 +395,7 @@ def generate_stock(drift_rate, sig, window):
 
 
 
-def run_trial(stock, time, trial_index):
+def run_trial(stock, time, trial_index, score, correct_states, el_tracker):
     """ Helper function specifying the events that will occur in a single trial
 
     trial_pars - a list containing trial parameters, e.g.,
@@ -418,7 +428,7 @@ def run_trial(stock, time, trial_index):
     ax.set_xticklabels( () ); ax.set_yticklabels( () )
     
     # Set y-limits = (-mean of final X_w - 3SD_w, mean_w + 3SD_w)
-    ylim = WINDOW*DRIFT + 2*SIG*np.sqrt(WINDOW)
+    ylim = WINDOW*DRIFT + 3*SIG*np.sqrt(WINDOW)
     ax.set_ylim(-ylim, ylim)
 #
 #    plt.axis('off')
@@ -431,25 +441,18 @@ def run_trial(stock, time, trial_index):
     plt.savefig('ndaq.png', dpi=80, transparent=True)
 
     img_path = Path() / "ndaq.png"
-    
-    
-    task_txt = """
-        Down         Sample           Up
-        N            SPACE            M
-        """
         
-#    background_image = visual.ImageStim(win, 'images/checker10000.png')
-    img = visual.ImageStim(win, image=img_path, size=None)
-    msg = visual.TextStim(win, text=task_txt, pos=(0,-1.7))
+    img = visual.ImageStim(win, image=img_path, size=None)    
+    
+    
+
+    
     
     # get a reference to the currently active EyeLink connection
     el_tracker = pylink.getEYELINK()
-    
+    print('recording check 1: ' + str(el_tracker.isRecording()))
     
     if not dummy_mode:
-        # put the tracker in the offline mode first
-        el_tracker.setOfflineMode()
-
         # clear the host screen before we draw the backdrop
         el_tracker.sendCommand('clear_screen 0')
 
@@ -501,56 +504,33 @@ def run_trial(stock, time, trial_index):
         # here we show how many trial has been tested
         status_msg = 'TRIAL number %d' % trial_index
         el_tracker.sendCommand("record_status_message '%s'" % status_msg)
+        
+    # no drift check: empty code
 
-    # drift check
-    # we recommend drift-check at the beginning of each trial
-    # the doDriftCorrect() function requires target position in integers
-    # the last two arguments:
-    # draw_target (1-default, 0-draw the target then call doDriftCorrect)
-    # allow_setup (1-press ESCAPE to recalibrate, 0-not allowed)
-    #
-    # Skip drift-check if running the script in Dummy Mode
-    while not dummy_mode:
-        # terminate the task if no longer connected to the tracker or
-        # user pressed Ctrl-C to terminate the task
-        if (not el_tracker.isConnected()) or el_tracker.breakPressed():
-            terminate_task()
-            return pylink.ABORT_EXPT
 
-        # drift-check and re-do camera setup if ESCAPE is pressed
-        try:
-            error = el_tracker.doDriftCorrect(int(scn_width/2.0),
-                                              int(scn_height/2.0), 1, 1)
-            # break following a success drift-check
-            if error is not pylink.ESC_KEY:
-                break
-        except:
-            pass
 
-    # put tracker in idle/offline mode before recording
-    if not dummy_mode:
-        el_tracker.setOfflineMode()
 
-    # Start recording
-    # arguments: sample_to_file, events_to_file, sample_over_link,
-    # event_over_link (1-yes, 0-no)
-    try:
-        el_tracker.startRecording(1, 1, 1, 1)
-    except RuntimeError as error:
-        print("ERROR:", error)
-        abort_trial()
-        return pylink.TRIAL_ERROR
 
     # Allocate some time for the tracker to cache some samples
     pylink.pumpDelay(100)
-
+    
+    
+    # draw fixation target
+    fixate = visual.Circle(
+        win=win,
+        units="pix",
+        radius=50,
+        fillColor=[0, 0, 0],
+        lineColor=[0.3, 0.3, 0.3],
+        lineWidth=8,
+        edges=128
+    )
+    fixate.draw()
     # show the image, and log a message to mark the onset of the image
-#    clear(win)
-#    background_image.draw()
+
     img.draw()
-#    msg.draw()
     win.flip()
-#    key = waitKeys(keyList=["m","n", "space", "q"])
+
     el_tracker.sendMessage('image_onset')
     img_onset_time = core.getTime()  # record the image onset time
 
@@ -578,19 +558,38 @@ def run_trial(stock, time, trial_index):
         # "Protocol for EyeLink Data to Viewer Integration"
         ia_pars = (1, left, top, right, bottom, 'screen_center')
         el_tracker.sendMessage('!V IAREA RECTANGLE %d %d %d %d %d %s' % ia_pars)
+        
+        
+        
+        
+        wait(2)
+        
+        fixate = visual.Circle(
+            win=win,
+            units="pix",
+            radius=50,
+            fillColor=[0, 0, 0],
+            lineColor=[-0.3, -0.3, -0.3],
+            lineWidth=8,
+            edges=128
+        )
+        fixate.draw()
+        # show the image, and log a message to mark the onset of the image
 
+        img.draw()
+        win.flip()
+        
+    
 #    # show the image for 5-secs or until the SPACEBAR is pressed
-#    event.clearEvents()  # clear cached PsychoPy events
+    event.clearEvents()  # clear cached PsychoPy events
     RT = -1  # keep track of the response time
     get_keypress = False
     space_bar = False
     key = ''
+    correct = None
+    sc = score
     if time < WINDOW and trial < TRIALS - 1:
         while not get_keypress:
-            # present the picture for a maximum of 5 seconds
-    #        if core.getTime() - img_onset_time >= 5.0:
-    #            el_tracker.sendMessage('time_out')
-    #            break
 
             # abort the current trial if the tracker is no longer recording
             error = el_tracker.isRecording()
@@ -630,6 +629,8 @@ def run_trial(stock, time, trial_index):
                     RT = int((core.getTime() - img_onset_time)*1000)
                     get_keypress = True
                     
+                    correct, sc = display_reward(win, key, score, correct_states)
+                    
                 if keycode == 'q':
                     terminate_task()
     else:
@@ -667,6 +668,8 @@ def run_trial(stock, time, trial_index):
                     RT = int((core.getTime() - img_onset_time)*1000)
                     get_keypress = True
                     
+                    correct, sc = display_reward(win, key, score, correct_states)
+                    
                 if keycode == 'q':
                     terminate_task()    
         
@@ -679,7 +682,7 @@ def run_trial(stock, time, trial_index):
 
         # stop recording; add 100 msec to catch final events before stopping
         pylink.pumpDelay(100)
-        el_tracker.stopRecording()
+#        el_tracker.stopRecording()
 
         # record trial variables to the EDF data file, for details, see Data
         # Viewer User Manual, "Protocol for EyeLink Data to Viewer Integration"
@@ -695,9 +698,36 @@ def run_trial(stock, time, trial_index):
     
     if get_keypress == True:
         if space_bar == True:
-            return 'right'
+            return 'right', correct, sc
         else:
-            return key
+            return key, correct, sc
+
+
+def display_reward(win, run, score, correct_states):
+    draw = np.random.uniform(0,1)
+    success = draw <= Q
+    cor = False
+    if success and run == 'up' and correct_states[trial] == 1:
+            score += REWARD
+            txt = "+" + str(REWARD)
+            cor = True
+    elif success and run == 'down' and correct_states[trial] == 0:
+        score += REWARD
+        txt = "+" + str(REWARD)
+        cor = True
+    else:
+        if success:
+            score += PUNISH
+            txt = str(PUNISH)
+        else:
+            txt = "+0"
+    show_msg(win, txt, h=70, wait_kb = False)
+    return cor, score
+
+
+
+
+
 
 
 # Step 5: Set up the camera and calibrate the tracker
@@ -721,6 +751,29 @@ if not dummy_mode:
     except RuntimeError as err:
         print('ERROR:', err)
         el_tracker.exitCalibration()
+        
+        
+        
+        
+el_tracker = pylink.getEYELINK()
+if not dummy_mode:
+    # put the tracker in the offline mode first
+    el_tracker.setOfflineMode()
+
+# put tracker in idle/offline mode before recording
+#    if not dummy_mode:
+#        el_tracker.setOfflineMode()
+
+# Start recording
+# arguments: sample_to_file, events_to_file, sample_over_link,
+# event_over_link (1-yes, 0-no)
+try:
+    print('start')
+    el_tracker.startRecording(1, 1, 1, 1)
+except RuntimeError as error:
+    print("ERROR:", error)
+    abort_trial()
+#    return pylink.TRIAL_ERROR
 
 # Step 6: Run the experimental trials, index all the trials
 genv.setTargetType('picture')
@@ -728,7 +781,7 @@ fig, ax = plt.subplots(figsize=(10,8))
 ax.plot(range(WINDOW+1), np.zeros((WINDOW+1,1)), linestyle='dashed', linewidth=3, color=(0.35, 0.35, 0.35))
 ax.set_xlim(0, WINDOW); ax.tick_params(width=4, length=12, color=(0.35, 0.35, 0.35))
 ax.set_xticklabels( () ); ax.set_yticklabels( () )
-ylim = WINDOW*DRIFT + 3*SIG*np.sqrt(WINDOW)
+ylim = WINDOW*DRIFT + 2*SIG*np.sqrt(WINDOW)
 ax.set_ylim(-ylim, ylim)
 for axis in ['top','bottom']:
     ax.spines[axis].set_linewidth(4)
@@ -743,53 +796,23 @@ genv.setPictureTarget(os.path.join('images', 'fixTarget.bmp'))
 responses = []; correct_states = []; correct_responses = []; score_tracker =[]
 run = 'right'; t = 1; score = 0
 stock = generate_stock(DRIFT, SIG, WINDOW)
-responses.append(run)
 for trial in range(TRIALS):
-    draw = np.random.uniform(0,1)
-    success = draw <= Q
     correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
+    run, correct, score = run_trial(stock, t, trial, score, correct_states, el_tracker)
+    print(run)
     if run == 'right' and t < WINDOW + 1: 
-        run = run_trial(stock, t, trial)
         correct_responses.append(np.nan)
+        t += 1
         
     elif run == 'up' or run == 'down':
-        print(draw, success)
-        if success and run == 'up' and correct_states[trial] == 1:
-            score += REWARD
-            txt = "+" + str(REWARD)
-        elif success and run == 'down' and correct_states[trial] == 0:
-            score += REWARD
-            txt = "+" + str(REWARD)
-        else:
-            if success:
-                score += PUNISH
-                txt = str(PUNISH)
-            else:
-                txt = "+0"
-        show_msg(win, txt, h=70, wait_kb = False)
+        correct_responses.append(correct)
         stock = generate_stock(DRIFT, SIG, WINDOW)
         t = 1
-        run = run_trial(stock, t, trial)
-        correct_responses.append(txt == "+" + str(REWARD))
-
-    responses.append(run); t += 1
+    responses.append(run); 
 
 
 # Last trial results, total score:
-if success and run == 'up' and correct_states[trial] == 1:
-    score += REWARD
-    txt = "+" + str(REWARD)
-elif success and run == 'down' and correct_states[trial] == 0:
-    score += REWARD
-    txt = "+" + str(REWARD)
-else:
-    if success:
-        score += PUNISH
-        txt = str(PUNISH)
-    else:
-        txt = "+0"
-txt = txt + "\n\n Final score: " + str(score)
-correct_states.append(stock[-1] > stock[0]); score_tracker.append(score); correct_responses.append(txt == "You received " + str(REWARD) + " points!")
+txt = "Final score: " + str(score)
 show_msg(win, txt, wait_kb = False, h=70); clear(win)
 
 responses = np.array(responses); correct_states = np.array(correct_states); 

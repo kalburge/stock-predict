@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import scipy.signal as sig
 
 
-CSV_PATH = "results/2023_06_01_16_07/csv"
+CSV_PATH = "results/2023_06_16_14_07/csv"
 
 def load_gaze_data(csv_path):
     gz = []
@@ -24,7 +24,7 @@ def remove_missing(pupil, time):
     
     T = time[len(time)-1]-time[0]
     idx = 0
-    for i in range(T):
+    for i in range(int(T)+1):
         time_nan.append(time[0] + i)
         if time[idx] == time[0]+i:
             pupil_nan.append(pupil[idx])
@@ -133,33 +133,58 @@ var, gaze = load_gaze_data(CSV_PATH)
 samples, pupil, time = get_pupil_time(var,gaze)
 plt.subplot(231)
 plt.plot(time,pupil)
-
+plt.xlabel("Time")
+plt.ylabel("Average Pupil Size")
+print(time[980:1015])
+print(pupil[980:1015])
+pupilOG = pupil
 
 pupil, time = remove_missing(pupil, time)
 plt.subplot(232)
 plt.plot(time,pupil)
+plt.xlabel("Time")
+plt.ylabel("Average Pupil Size")
+print(time[980:1015])
+print(pupil[980:1015])
+for i in range(len(pupil)):
+    if pupil[i] != pupilOG[i]:
+        print(pupil[i], pupilOG[i], i)
+        break
+
 
 
 blinks, bstarts, bends = get_blinks(var, gaze)
 pupil = remove_blinks(pupil, bstarts, bends)
 plt.subplot(233)
 plt.plot(time, pupil)
+plt.xlabel("Time")
+plt.ylabel("Average Pupil Size")
+
 
 
 pupil = filter_derivs(pupil)
 plt.subplot(234)
 plt.plot(time,pupil)
+plt.xlabel("Time")
+plt.ylabel("Average Pupil Size")
+
 
 
 pupil = filter_outliers(pupil)
 plt.subplot(235)
 plt.plot(time,pupil)
+plt.xlabel("Time")
+plt.ylabel("Average Pupil Size")
+
 
 
 
 pupil = filter_signal(interpolate(pupil))
 plt.subplot(236)
 plt.plot(time,pupil)
+plt.xlabel("Time")
+plt.ylabel("Average Pupil Size")
+
 
 data_path = 'pupil_preprocessed.csv'
 save_data(CSV_PATH + '/' + data_path, time,pupil)
