@@ -26,7 +26,7 @@ WINDOW = 5; TRIALS = WINDOW*5
 DRIFT = 0.5; SIG = 1; REWARD = 3; PUNISH = -1; Q = 0.6; EPS = 0.2
 
 memory_mode = True
-dummy_mode = False
+dummy_mode = True
 full_screen = False
 use_retina = False
 edf_fname = 'ARM3_ET'
@@ -110,10 +110,6 @@ if dummy_mode:
 else:
     try:
         el_tracker = pylink.EyeLink("100.1.1.1")
-        el_start_time = el_tracker.getCurrentTime()
-        print("EyeLink Start Time:", el_start_time)
-        psy_start_time = core.getTime()
-        print("PsychoPy Start Time:", psy_start_time)
     except RuntimeError as error:
         print('ERROR:', error)
         core.quit()
@@ -426,27 +422,27 @@ def generate_stimuli(stock):
 
 
 
-def run_trial(stock, time, trial_index, score, correct_states):
-    
-    print('start draw:', core.getTime())
-    
-    
-    img_path = 'images/stock_' + str(time) + '.png'
-    img = visual.ImageStim(win, image=img_path, size=None)    
-    
-    print('finish draw:', core.getTime())
-    
-    # get a reference to the currently active EyeLink connection
+def run_trial():
     el_tracker = pylink.getEYELINK()
+    
+    experiment_el_time = el_tracker.getCurrentTime()
+    print("EyeLink Time Elapsed Until Task Start:", experiment_el_time - el_start_time)
+    experiment_psy_time = core.getTime()*1000
+    print("PsychoPy Time Elapsed Until Task Start:", experiment_psy_time - psy_start_time)
+    
+    responses = []; correct_states = []; correct_responses = []; score_tracker =[]
+    run = 'right'; time = 1; score = 0; keypress_time = 0
+    state = np.sign(np.random.uniform(-1, 1))
+    stock = generate_stock(state*DRIFT, SIG, WINDOW); generate_stimuli(stock)
+    # get a reference to the currently active EyeLink connection
+    
         
     # no drift check: empty code
-    print('get ET:', core.getTime())
 
     # put tracker in idle/offline mode before recording
     if not dummy_mode:
         el_tracker.setOfflineMode()
     
-    print('set offline:', core.getTime())
     # Start recording
     # arguments: sample_to_file, events_to_file, sample_over_link,
     # event_over_link (1-yes, 0-no)
@@ -456,149 +452,170 @@ def run_trial(stock, time, trial_index, score, correct_states):
         print("ERROR:", error)
         abort_trial()
         return pylink.TRIAL_ERROR
-
-    print('start recording:', core.getTime())
-
-    # Allocate some time for the tracker to cache some samples
-#    pylink.pumpDelay(100)
     
-    print('pump delay:', core.getTime())
-
-    # draw fixation target
-    if not dummy_mode:
-        fixate = visual.Circle(
-            win=win,
-            units="pix",
-            radius=50,
-            fillColor=[0, 0, 0],
-            lineColor=[0.3, 0.3, 0.3],
-            lineWidth=8,
-            edges=128
-        )
-        fixate.draw()
-
-
-    # show the image, and log a message to mark the onset of the image
-    img.draw()
-    win.flip()
-
-#    el_tracker.sendMessage('image_onset')
-    img_onset_time = core.getTime()  # record the image onset time
-
-    # Send a message to clear the Data Viewer screen, get it ready for
-    # drawing the pictures during visualization
-    if not dummy_mode:
-#        wait(2)
+    recording_start = core.getTime()*1000
+    print('start recording:', recording_start)
+    
+    for trial in range(TRIALS):
+        el_step_start = el_tracker.getCurrentTime()
+        psy_step_start = core.getTime()*1000
         
-        fixate = visual.Circle(
-            win=win,
-            units="pix",
-            radius=50,
-            fillColor=[0, 0, 0],
-            lineColor=[-0.3, -0.3, -0.3],
-            lineWidth=8,
-            edges=128
-        )
-        fixate.draw()
-        # show the image, and log a message to mark the onset of the image
+        
+        correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
+        img_path = 'images/stock_' + str(time) + '.png'
+        img = visual.ImageStim(win, image=img_path, size=None)   
+        
+        # draw fixation target
+        if not dummy_mode:
+            fixate = visual.Circle(
+                win=win,
+                units="pix",
+                radius=50,
+                fillColor=[0, 0, 0],
+                lineColor=[0.3, 0.3, 0.3],
+                lineWidth=8,
+                edges=128
+            )
+            fixate.draw()
 
+
+        # show the image, and log a message to mark the onset of the image
         img.draw()
         win.flip()
-        print('IMGDRAW:', core.getTime())
-        
+        # Send a message to clear the Data Viewer screen, get it ready for
+        # drawing the pictures during visualization
+        if not dummy_mode:
+            wait(1)
+            fixate = visual.Circle(
+                win=win,
+                units="pix",
+                radius=50,
+                fillColor=[0, 0, 0],
+                lineColor=[-0.3, -0.3, -0.3],
+                lineWidth=8,
+                edges=128
+            )
+            fixate.draw()
+            # show the image, and log a message to mark the onset of the image
+
+            img.draw()
+            win.flip()
     
-    event.clearEvents()  # clear cached PsychoPy events
-    RT = -1  # keep track of the response time
-    get_keypress = False
-    space_bar = False
-    key = ''
-    correct = None
-    if time < WINDOW and trial < TRIALS - 1:
-        while not get_keypress:
+        img_onset_time = core.getTime()*1000  # record the image onset time
+        print("Lag:", img_onset_time - keypress_time)
+    
+        event.clearEvents()  # clear cached PsychoPy events
+        RT = -1  # keep track of the response time
+        key = ''
+        get_keypress = False
+        correct = None
+        if time < WINDOW and trial < TRIALS - 1:
+            while not get_keypress:
 
-            # abort the current trial if the tracker is no longer recording
-            error = el_tracker.isRecording()
-            if error is not pylink.TRIAL_OK:
-                el_tracker.sendMessage('tracker_disconnected')
-                abort_trial()
-                return error
-
-            # check keyboard events
-            for keycode, modifier in event.getKeys(modifiers=True):
-                # Stop stimulus presentation when the spacebar is pressed
-                if keycode == 'right':
-                    keypress_time = core.getTime()
-                    # get response time in ms, PsychoPy report time in sec
-                    RT = int((core.getTime() - img_onset_time)*1000)
-                    get_keypress = True
-                    space_bar = True
-                    key = keycode
-
-                # Abort a trial if "ESCAPE" is pressed
-                if keycode == 'escape':
-                    el_tracker.sendMessage('trial_skipped_by_user')
-                    # clear the screen
-                    clear(win)
-                    # abort trial
+                # abort the current trial if the tracker is no longer recording
+                error = el_tracker.isRecording()
+                if error is not pylink.TRIAL_OK:
+                    el_tracker.sendMessage('tracker_disconnected')
                     abort_trial()
-                    return pylink.SKIP_TRIAL
-                    
-                if keycode == 'up' or keycode == 'down':
-                    keypress_time = core.getTime()
-                    key = keycode
-                    # get response time in ms, PsychoPy report time in sec
-                    RT = int((core.getTime() - img_onset_time)*1000)
-                    get_keypress = True
-                    
-                    correct, score = display_reward(win, key, score, correct_states)
-                    
-                if keycode == 'q':
-                    terminate_task()
-    else:
-        while not get_keypress:
+                    return error
 
-            # abort the current trial if the tracker is no longer recording
-            error = el_tracker.isRecording()
-            if error is not pylink.TRIAL_OK:
-                el_tracker.sendMessage('tracker_disconnected')
-                abort_trial()
-                return error
+                # check keyboard events
+                for keycode, modifier in event.getKeys(modifiers=True):
+                    # Stop stimulus presentation when the spacebar is pressed
+                    if keycode == 'right':
+                        keypress_time = core.getTime()*1000
+                        # get response time in ms, PsychoPy report time in sec
+                        RT = int((core.getTime() - img_onset_time))
+                        key = keycode
+                        get_keypress = True
 
-            # check keyboard events
-            for keycode, modifier in event.getKeys(modifiers=True):
+                    # Abort a trial if "ESCAPE" is pressed
+                    if keycode == 'escape':
+                        el_tracker.sendMessage('trial_skipped_by_user')
+                        # clear the screen
+                        clear(win)
+                        # abort trial
+                        abort_trial()
+                        return pylink.SKIP_TRIAL
+                        
+                    if keycode == 'up' or keycode == 'down':
+                        keypress_time = core.getTime()*1000
+                        key = keycode
+                        # get response time in ms, PsychoPy report time in sec
+                        RT = int((core.getTime() - img_onset_time))
+                        correct, score = display_reward(win, key, score, correct_states, trial)
+                        get_keypress = True
 
-                # Abort a trial if "ESCAPE" is pressed
-                if keycode == 'escape':
-                    el_tracker.sendMessage('trial_skipped_by_user')
-                    # clear the screen
-                    clear(win)
-                    # abort trial
+                        
+                    if keycode == 'q':
+                        terminate_task()
+        else:
+            while not get_keypress:
+
+                # abort the current trial if the tracker is no longer recording
+                error = el_tracker.isRecording()
+                if error is not pylink.TRIAL_OK:
+                    el_tracker.sendMessage('tracker_disconnected')
                     abort_trial()
-                    return pylink.SKIP_TRIAL
-                    
-                if keycode == 'up' or keycode == 'down':
-                    keypress_time = core.getTime()
-                    key = keycode
-                    # get response time in ms, PsychoPy report time in sec
-                    RT = int((core.getTime() - img_onset_time)*1000)
-                    get_keypress = True
-                    
-                    correct, score = display_reward(win, key, score, correct_states)
-                    
-                if keycode == 'q':
-                    terminate_task()    
+                    return error
 
+                # check keyboard events
+                for keycode, modifier in event.getKeys(modifiers=True):
+
+                    # Abort a trial if "ESCAPE" is pressed
+                    if keycode == 'escape':
+                        el_tracker.sendMessage('trial_skipped_by_user')
+                        # clear the screen
+                        clear(win)
+                        # abort trial
+                        abort_trial()
+                        return pylink.SKIP_TRIAL
+                        
+                    if keycode == 'up' or keycode == 'down':
+                        keypress_time = core.getTime()*1000
+                        key = keycode
+                        # get response time in ms, PsychoPy report time in sec
+                        RT = int((core.getTime() - img_onset_time))
+                        correct, score = display_reward(win, key, score, correct_states, trial)
+                        get_keypress = True
+                        
+                    if keycode == 'q':
+                        terminate_task()
+        if key == 'right' and time < WINDOW + 1: 
+            correct_responses.append(np.nan)
+            time += 1
+        elif key == 'up' or key == 'down':
+            correct_responses.append(correct)
+            switch = np.random.uniform(0,1) <= EPS
+            if switch:
+                state = -1*state
+            stock = generate_stock(state*DRIFT, SIG, WINDOW); generate_stimuli(stock)
+            time = 1
+        responses.append(run); 
+        
+        
+        el_step_end = el_tracker.getCurrentTime()
+        print("EyeLink Task Time:", el_step_end - el_step_start)
+        psy_step_end = core.getTime()*1000
+        print("PsychoPy Task Time:", psy_step_end - psy_step_start)
+    
+    end_time = core.getTime()*1000    
+    
+    responses = np.array(responses); correct_states = np.array(correct_states); 
+    correct_responses = np.array(correct_responses); score_tracker = np.array(score_tracker)
+    responses = responses.reshape(len(responses),1); correct_states = correct_states.reshape(len(correct_states),1); 
+    correct_responses = correct_responses.reshape(len(correct_responses),1); score_tracker = score_tracker.reshape(len(score_tracker),1)
+    print(len(responses), len(correct_states), len(correct_responses), len(score_tracker))
+    df = np.concatenate((responses,correct_states,correct_responses,score_tracker),axis=1)
+    df = pd.DataFrame(df, columns=["responses", "correct_states", "correct_responses", "score_tracker"])
+    df.to_csv('resultsDF.csv', index=False)
+    
     if not dummy_mode:
         el_tracker.stopRecording()
+    
+    return score
 
-    if get_keypress == True:
-        if space_bar == True:
-            return 'right', correct, score
-        else:
-            return key, correct, score
-
-
-def display_reward(win, run, score, correct_states):
+def display_reward(win, run, score, correct_states, trial):
     draw = np.random.uniform(0,1)
     success = draw <= Q
     cor = False
@@ -646,40 +663,18 @@ if not dummy_mode:
 genv.setTargetType('picture')
 genv.setPictureTarget(os.path.join('images', 'fixTarget.bmp'))
 
-responses = []; correct_states = []; correct_responses = []; score_tracker =[]
-run = 'right'; t = 1; score = 0
-state = np.sign(np.random.uniform(-1, 1))
-stock = generate_stock(state*DRIFT, SIG, WINDOW); generate_stimuli(stock)
-for trial in range(TRIALS):
-    correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
-    run, correct, score = run_trial(stock, t, trial, score, correct_states)
-    if run == 'right' and t < WINDOW + 1: 
-        correct_responses.append(np.nan)
-        t += 1
-        
-    elif run == 'up' or run == 'down':
-        correct_responses.append(correct)
-        switch = np.random.uniform(0,1) <= EPS
-        if switch:
-            state = -1*state
-        stock = generate_stock(state*DRIFT, SIG, WINDOW); generate_stimuli(stock)
-        t = 1
-    responses.append(run); 
 
+el_start_time = el_tracker.getCurrentTime(); psy_start_time = core.getTime()*1000
 
+score = run_trial()
+
+el_end_time = el_tracker.getCurrentTime(); psy_end_time = core.getTime()*1000
+
+print("EyeLink Time Elapsed:", el_end_time - el_start_time)
+print("PsychoPy Time Elapsed:", psy_end_time - psy_start_time)
+print("Drift:", abs((el_end_time - el_start_time) - (psy_end_time - psy_start_time)))
 # Last trial results, total score:
 txt = "Final score: " + str(score)
 show_msg(win, txt, wait_kb = False, h=70); clear(win)
-
-responses = np.array(responses); correct_states = np.array(correct_states); 
-correct_responses = np.array(correct_responses); score_tracker = np.array(score_tracker)
-responses = responses.reshape(len(responses),1); correct_states = correct_states.reshape(len(correct_states),1); 
-correct_responses = correct_responses.reshape(len(correct_responses),1); score_tracker = score_tracker.reshape(len(score_tracker),1)
-
-
-print(len(responses), len(correct_states), len(correct_responses), len(score_tracker))
-df = np.concatenate((responses,correct_states,correct_responses,score_tracker),axis=1)
-df = pd.DataFrame(df, columns=["responses", "correct_states", "correct_responses", "score_tracker"])
-df.to_csv('resultsDF.csv', index=False)
 # Step 7: disconnect, download the EDF file, then terminate the task
 terminate_task()
