@@ -262,25 +262,7 @@ pylink.openGraphicsEx(genv)
 
 def clear(win):
     """ clear up the PsychoPy window"""
-
-#    win.fillColor = genv.getBackgroundColor()
     win.flip()
-
-
-#def show_msg(win, text, wait_for_keypress=True):
-#    """ Show task instructions on screen"""
-#
-#    msg = visual.TextStim(win, text,
-#                          color=genv.getForegroundColor(),
-#                          wrapWidth=scn_width/2)
-#    clear_screen(win)
-#    msg.draw()
-#    win.flip()
-#
-#    # wait indefinitely, terminates upon any key press
-#    if wait_for_keypress:
-#        event.waitKeys()
-#        clear_screen(win)
 
 
 def show_msg(win, txt, time=T_STIM, h=None, p=(0,0), wait_kb=True):
@@ -461,7 +443,8 @@ def run_trial():
         psy_step_start = core.getTime()*1000
         
         
-        correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
+#        correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
+        correct_states.append(state > 0); score_tracker.append(score)
         img_path = 'images/stock_' + str(time) + '.png'
         img = visual.ImageStim(win, image=img_path, size=None)   
         
@@ -608,7 +591,7 @@ def run_trial():
     print(len(responses), len(correct_states), len(correct_responses), len(score_tracker))
     df = np.concatenate((responses,correct_states,correct_responses,score_tracker),axis=1)
     df = pd.DataFrame(df, columns=["responses", "correct_states", "correct_responses", "score_tracker"])
-    df.to_csv('resultsDF.csv', index=False)
+    df.to_csv(session_folder + '/resultsDF.csv', index=False)
     
     if not dummy_mode:
         el_tracker.stopRecording()
@@ -619,13 +602,15 @@ def display_reward(win, run, score, correct_states, trial):
     draw = np.random.uniform(0,1)
     success = draw <= Q
     cor = False
-    if success and run == 'up' and correct_states[trial] == 1:
+    if run == 'up' and correct_state == 1:
+        if success:
             score += REWARD
             txt = "+" + str(REWARD)
-            cor = True
-    elif success and run == 'down' and correct_states[trial] == 0:
-        score += REWARD
-        txt = "+" + str(REWARD)
+        cor = True
+    elif run == 'down' and correct_state == 0:
+        if success:
+            score += REWARD
+            txt = "+" + str(REWARD)
         cor = True
     else:
         if success:

@@ -28,6 +28,7 @@ FULLSCR = False
 WINDOW = 3
 MAX_SAMP = 15
 
+
 # Switch to the script folder
 script_path = os.path.dirname(sys.argv[0])
 if len(script_path) != 0:
@@ -49,12 +50,6 @@ dummy_mode = False
 # Set this variable to True to run the task in full screen mode
 # It is easier to debug the script in non-fullscreen mode
 full_screen = False
-
-# Store the parameters of all trials in a list, [condition, image]
-trials = [
-    ['cond_1', 'img_1.jpg'],
-    ['cond_2', 'img_2.jpg'],
-    ]
 
 # Set up EDF data file name and local data folder
 #
@@ -105,11 +100,11 @@ if not os.path.exists(results_folder):
 # We download EDF data file from the EyeLink Host PC to the local hard
 # drive at the end of each testing session, here we rename the EDF to
 # include session start date/time
-time_str = time.strftime("_%Y_%m_%d_%H_%M", time.localtime())
-session_identifier = edf_fname + time_str
+time_str = time.strftime("%Y_%m_%d_%H_%M", time.localtime())
+session_identifier = edf_fname
 
 # create a folder for the current testing session in the "results" folder
-session_folder = os.path.join(results_folder, session_identifier)
+session_folder = os.path.join(results_folder, time_str)
 if not os.path.exists(session_folder):
     os.makedirs(session_folder)
 
@@ -416,6 +411,11 @@ def abort_trial():
     return pylink.TRIAL_ERROR
 
 
+
+
+
+
+
 def run_trial(start_date, current_date, trial_index):
     """ Helper function specifying the events that will occur in a single trial
 
@@ -445,7 +445,7 @@ def run_trial(start_date, current_date, trial_index):
     
     
     task_txt = """
-        Sell         Sample           Buy
+        Down         Sample           Up
         N            SPACE            M
         """
     img = visual.ImageStim(win, image=img_path, size=None)

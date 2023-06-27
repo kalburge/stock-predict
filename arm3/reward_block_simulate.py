@@ -40,25 +40,25 @@ ax.set_xticks(np.linspace(N, 1, 4), labels=[])
 ax.set_ylim(np.max(np.abs(ax.get_ylim()))*np.array([-1, 1]))
 ax.set_yticks(np.linspace(ax.get_ylim()[0], ax.get_ylim()[1], 5), labels=[])
 print(ax.get_yticks())
-ax.spines[['top', 'right']].set_visible(False)
-
-RT_rewarded = block.RT[block.reward == R[0]]
-RT_punished = block.RT[block.reward == R[1]]
-choice_rewarded = block.choice[block.reward == R[0]]
-choice_punished = block.choice[block.reward == R[1]]
-
-# Plot action timeseries representation:
-fig, ax = plt.subplots()
-if len(RT_rewarded) > 0:
-    S = ax.stem(RT_rewarded, choice_rewarded, markerfmt='go', linefmt='green')
-    S[0].set_markersize(10); S[1].set_linewidth(5)
-
-if len(RT_punished) > 0:
-    S = ax.stem(RT_punished, choice_punished, markerfmt='ro', linefmt='red')
-    S[0].set_markersize(10); S[1].set_linewidth(5)
-    
-ax.plot(t, np.zeros_like(t), color='black')
-ax.set_xlim((N, 0.8))
-ax.set_xticks(np.linspace(N, 1, 4), labels=[])
-ax.set_yticks([])
-ax.spines[['top', 'right', 'left']].set_visible(False)
+#ax.spines[['top', 'right']].set_visible(False)
+#
+#RT_rewarded = block.RT[block.reward == R[0]]
+#RT_punished = block.RT[block.reward == R[1]]
+#choice_rewarded = block.choice[block.reward == R[0]]
+#choice_punished = block.choice[block.reward == R[1]]
+#
+## Plot action timeseries representation:
+#fig, ax = plt.subplots()
+#if len(RT_rewarded) > 0:
+#    S = ax.stem(RT_rewarded, choice_rewarded, markerfmt='go', linefmt='green')
+#    S[0].set_markersize(10); S[1].set_linewidth(5)
+#
+#if len(RT_punished) > 0:
+#    S = ax.stem(RT_punished, choice_punished, markerfmt='ro', linefmt='red')
+#    S[0].set_markersize(10); S[1].set_linewidth(5)
+#    
+#ax.plot(t, np.zeros_like(t), color='black')
+#ax.set_xlim((N, 0.8))
+#ax.set_xticks(np.linspace(N, 1, 4), labels=[])
+#ax.set_yticks([])
+#ax.spines[['top', 'right', 'left']].set_visible(False)

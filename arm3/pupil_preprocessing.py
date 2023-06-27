@@ -5,7 +5,8 @@ import matplotlib.pyplot as plt
 import scipy.signal as sig
 
 
-CSV_PATH = "results/2023_06_16_14_07/csv"
+#CSV_PATH = "results/2023_06_19_09_06/csv"
+CSV_PATH = "results/2023_06_20_09_09/csv"
 
 def load_gaze_data(csv_path):
     gz = []
@@ -135,8 +136,6 @@ plt.subplot(231)
 plt.plot(time,pupil)
 plt.xlabel("Time")
 plt.ylabel("Average Pupil Size")
-print(time[980:1015])
-print(pupil[980:1015])
 pupilOG = pupil
 
 pupil, time = remove_missing(pupil, time)
@@ -144,12 +143,6 @@ plt.subplot(232)
 plt.plot(time,pupil)
 plt.xlabel("Time")
 plt.ylabel("Average Pupil Size")
-print(time[980:1015])
-print(pupil[980:1015])
-for i in range(len(pupil)):
-    if pupil[i] != pupilOG[i]:
-        print(pupil[i], pupilOG[i], i)
-        break
 
 
 

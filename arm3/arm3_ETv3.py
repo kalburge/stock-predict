@@ -23,10 +23,10 @@ import matplotlib.pyplot as plt
 WIN_DIM = (1600,1200); T_STIM = 0.5
 FULLSCR = False
 WINDOW = 5; TRIALS = WINDOW*5
-DRIFT = 1; SIG = 5; REWARD = 3; PUNISH = -1; Q = 0.6
+DRIFT = 0.5; SIG = 1; REWARD = 3; PUNISH = -1; Q = 0.6; EPS = 0.2
 
 memory_mode = True
-dummy_mode = False
+dummy_mode = True
 full_screen = False
 use_retina = False
 edf_fname = 'ARM3_ET'
@@ -517,16 +517,17 @@ def run_trial(stock, time, trial_index, score, correct_states):
     
     
     # draw fixation target
-    fixate = visual.Circle(
-        win=win,
-        units="pix",
-        radius=50,
-        fillColor=[0, 0, 0],
-        lineColor=[0.3, 0.3, 0.3],
-        lineWidth=8,
-        edges=128
-    )
-    fixate.draw()
+    if not dummy_mode:
+        fixate = visual.Circle(
+            win=win,
+            units="pix",
+            radius=50,
+            fillColor=[0, 0, 0],
+            lineColor=[0.3, 0.3, 0.3],
+            lineWidth=8,
+            edges=128
+        )
+        fixate.draw()
     # show the image, and log a message to mark the onset of the image
 
     img.draw()
@@ -682,7 +683,7 @@ def run_trial(stock, time, trial_index, score, correct_states):
 
         # stop recording; add 100 msec to catch final events before stopping
         pylink.pumpDelay(100)
-#        el_tracker.stopRecording()
+        el_tracker.stopRecording()
 
         # record trial variables to the EDF data file, for details, see Data
         # Viewer User Manual, "Protocol for EyeLink Data to Viewer Integration"
@@ -749,25 +750,26 @@ if not dummy_mode:
 
 # Step 6: Run the experimental trials, index all the trials
 genv.setTargetType('picture')
-fig, ax = plt.subplots(figsize=(10,8))
-ax.plot(range(WINDOW+1), np.zeros((WINDOW+1,1)), linestyle='dashed', linewidth=3, color=(0.35, 0.35, 0.35))
-ax.set_xlim(0, WINDOW); ax.tick_params(width=4, length=12, color=(0.35, 0.35, 0.35))
-ax.set_xticklabels( () ); ax.set_yticklabels( () )
-ylim = WINDOW*DRIFT + 2*SIG*np.sqrt(WINDOW)
-ax.set_ylim(-ylim, ylim)
-for axis in ['top','bottom']:
-    ax.spines[axis].set_linewidth(4)
-    ax.spines[axis].set_color((0.35, 0.35, 0.35)) 
-for axis in ['left', 'right']:
-    ax.spines[axis].set_linewidth(4)
-    ax.spines[axis].set_color((0.65, 0.65, 0.65)) 
-plt.savefig('baseline.png', dpi=80, transparent=True)
+#fig, ax = plt.subplots(figsize=(10,8))
+#ax.plot(range(WINDOW+1), np.zeros((WINDOW+1,1)), linestyle='dashed', linewidth=3, color=(0.35, 0.35, 0.35))
+#ax.set_xlim(0, WINDOW); ax.tick_params(width=4, length=12, color=(0.35, 0.35, 0.35))
+#ax.set_xticklabels( () ); ax.set_yticklabels( () )
+#ylim = WINDOW*DRIFT + 2*SIG*np.sqrt(WINDOW)
+#ax.set_ylim(-ylim, ylim)
+#for axis in ['top','bottom']:
+#    ax.spines[axis].set_linewidth(4)
+#    ax.spines[axis].set_color((0.35, 0.35, 0.35)) 
+#for axis in ['left', 'right']:
+#    ax.spines[axis].set_linewidth(4)
+#    ax.spines[axis].set_color((0.65, 0.65, 0.65)) 
+#plt.savefig('baseline.png', dpi=80, transparent=True)
 #genv.setPictureTarget('baseline.png')
 genv.setPictureTarget(os.path.join('images', 'fixTarget.bmp'))
 
 responses = []; correct_states = []; correct_responses = []; score_tracker =[]
 run = 'right'; t = 1; score = 0
-stock = generate_stock(DRIFT, SIG, WINDOW)
+state = np.sign(np.random.uniform(-1, 1))
+stock = generate_stock(state*DRIFT, SIG, WINDOW)
 for trial in range(TRIALS):
     correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
     run, correct, score = run_trial(stock, t, trial, score, correct_states)
@@ -777,7 +779,10 @@ for trial in range(TRIALS):
         
     elif run == 'up' or run == 'down':
         correct_responses.append(correct)
-        stock = generate_stock(DRIFT, SIG, WINDOW)
+        switch = np.random.uniform(0,1) <= EPS
+        if switch:
+            state = -1*state
+        stock = generate_stock(state*DRIFT, SIG, WINDOW)
         t = 1
     responses.append(run); 
 
