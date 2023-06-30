@@ -22,7 +22,7 @@ import matplotlib.pyplot as plt
 
 WIN_DIM = (1600,1200); T_STIM = 0.5
 FULLSCR = False
-WINDOW = 5; TRIALS = WINDOW*5
+WINDOW = 14; TRIALS = 210
 DRIFT = 0.5; SIG = 1; REWARD = 3; PUNISH = -1; Q = 0.6; EPS = 0.2
 
 memory_mode = True
@@ -412,8 +412,8 @@ def run_trial():
     experiment_psy_time = core.getTime()*1000
     print("PsychoPy Time Elapsed Until Task Start:", experiment_psy_time - psy_start_time)
     
-    responses = []; correct_states = []; correct_responses = []; score_tracker =[]
-    run = 'right'; time = 1; score = 0; keypress_time = 0
+    responses = []; correct_states = []; correct_responses = []; score_tracker =[]; RT_tracker = [];
+    time = 1; score = 0; keypress_time = 0
     state = np.sign(np.random.uniform(-1, 1))
     stock = generate_stock(state*DRIFT, SIG, WINDOW); generate_stimuli(stock)
     # get a reference to the currently active EyeLink connection
@@ -508,7 +508,7 @@ def run_trial():
                     if keycode == 'right':
                         keypress_time = core.getTime()*1000
                         # get response time in ms, PsychoPy report time in sec
-                        RT = int((core.getTime() - img_onset_time))
+                        RT = int((core.getTime()*1000 - img_onset_time))
                         key = keycode
                         get_keypress = True
 
@@ -525,8 +525,8 @@ def run_trial():
                         keypress_time = core.getTime()*1000
                         key = keycode
                         # get response time in ms, PsychoPy report time in sec
-                        RT = int((core.getTime() - img_onset_time))
-                        correct, score = display_reward(win, key, score, correct_states, trial)
+                        RT = int((core.getTime()*1000 - img_onset_time))
+                        correct, score = display_reward(win, key, score, state)
                         get_keypress = True
 
                         
@@ -558,8 +558,8 @@ def run_trial():
                         keypress_time = core.getTime()*1000
                         key = keycode
                         # get response time in ms, PsychoPy report time in sec
-                        RT = int((core.getTime() - img_onset_time))
-                        correct, score = display_reward(win, key, score, correct_states, trial)
+                        RT = int((core.getTime()*1000 - img_onset_time))
+                        correct, score = display_reward(win, key, score, state)
                         get_keypress = True
                         
                     if keycode == 'q':
@@ -574,7 +574,8 @@ def run_trial():
                 state = -1*state
             stock = generate_stock(state*DRIFT, SIG, WINDOW); generate_stimuli(stock)
             time = 1
-        responses.append(run); 
+        RT_tracker.append(RT)
+        responses.append(key); 
         
         
         el_step_end = el_tracker.getCurrentTime()
@@ -584,13 +585,14 @@ def run_trial():
     
     end_time = core.getTime()*1000    
     
-    responses = np.array(responses); correct_states = np.array(correct_states); 
+    responses = np.array(responses); correct_states = np.array(correct_states); RT_tracker = np.array(RT_tracker)
     correct_responses = np.array(correct_responses); score_tracker = np.array(score_tracker)
     responses = responses.reshape(len(responses),1); correct_states = correct_states.reshape(len(correct_states),1); 
     correct_responses = correct_responses.reshape(len(correct_responses),1); score_tracker = score_tracker.reshape(len(score_tracker),1)
+    RT_tracker = RT_tracker.reshape(len(RT_tracker),1)
     print(len(responses), len(correct_states), len(correct_responses), len(score_tracker))
-    df = np.concatenate((responses,correct_states,correct_responses,score_tracker),axis=1)
-    df = pd.DataFrame(df, columns=["responses", "correct_states", "correct_responses", "score_tracker"])
+    df = np.concatenate((responses,correct_states,correct_responses,score_tracker, RT_tracker),axis=1)
+    df = pd.DataFrame(df, columns=["responses", "correct_states", "correct_responses", "score_tracker", "RT_tracker"])
     df.to_csv(session_folder + '/resultsDF.csv', index=False)
     
     if not dummy_mode:
@@ -598,26 +600,25 @@ def run_trial():
     
     return score
 
-def display_reward(win, run, score, correct_states, trial):
+def display_reward(win, run, score, state):
     draw = np.random.uniform(0,1)
     success = draw <= Q
     cor = False
-    if run == 'up' and correct_state == 1:
+    txt = "No Feedback"
+    if run == 'up' and state > 0:
         if success:
             score += REWARD
-            txt = "+" + str(REWARD)
+            txt = "Correct!"
         cor = True
-    elif run == 'down' and correct_state == 0:
+    elif run == 'down' and state < 0:
         if success:
             score += REWARD
-            txt = "+" + str(REWARD)
+            txt = "Correct!"
         cor = True
     else:
         if success:
             score += PUNISH
-            txt = str(PUNISH)
-        else:
-            txt = "+0"
+            txt = "Incorrect!"
     show_msg(win, txt, h=70, wait_kb = False)
     return cor, score
 
