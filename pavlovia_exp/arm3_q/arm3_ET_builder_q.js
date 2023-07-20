@@ -274,11 +274,11 @@ var low;
 var high;
 var counter;
 var running_score;
-var avg_score = 0;
+var avg_score = 387;
 var conditions;
 var condText = '';
 var numSteps = 370;
-const param_set = [[0.05, 5], [0.1786, 15], [0.3071, 27], [0.4357, 39], [0.5643, 52], [0.6929, 67], [0.8214, 80], [0.95, 102]]; 
+const param_set = [0.05, 0.1786, 0.3071, 0.4357, 0.5643, 0.6929, 0.8214, 0.95]; 
 var numBlocks = param_set.length;
 var params = shuffle(param_set);
 var feedbackRel = 0;
@@ -1916,7 +1916,6 @@ function blocksLoopBegin(blocksLoopScheduler, snapshot) {
 
 
 var steps;
-var this_param;
 function stepsLoopBegin(stepsLoopScheduler, snapshot) {
   return async function() {
     TrialHandler.fromSnapshot(snapshot); // update internal variables (.thisN etc) of the loop
@@ -1924,9 +1923,7 @@ function stepsLoopBegin(stepsLoopScheduler, snapshot) {
     currentHour = 0;
     blockN += 1;
     stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
-    this_param = params.pop();
-    feedbackRel = this_param[0];
-    avg_score = this_param[1];
+    feedbackRel = params.pop();
     // [0.05, 0.1786, 0.3071, 0.4357, 0.5643, 0.6929, 0.8214, 0.95]; 
     if (feedbackRel == 0.05) {
         condText = "Frequency Level 1";
