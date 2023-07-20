@@ -274,11 +274,11 @@ var low;
 var high;
 var counter;
 var running_score;
-var avg_score = 0;
+var avg_score = 108;
 var conditions;
 var condText = '';
 var numSteps = 370;
-const param_set = [[0.05, 27], [0.1143, 18], [0.1786, 13], [0.2429, 11], [0.3071, 10], [0.3714, 10], [0.4357, 10], [0.5, 9]]
+const param_set = [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5];
 var numBlocks = param_set.length;
 var params = shuffle(param_set);
 var feedbackRel = 0.125;
@@ -1920,7 +1920,6 @@ function blocksLoopBegin(blocksLoopScheduler, snapshot) {
 
 
 var steps;
-var this_param;
 function stepsLoopBegin(stepsLoopScheduler, snapshot) {
   return async function() {
     TrialHandler.fromSnapshot(snapshot); // update internal variables (.thisN etc) of the loop
@@ -1928,9 +1927,7 @@ function stepsLoopBegin(stepsLoopScheduler, snapshot) {
     currentHour = 0;
     blockN += 1;
     stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
-    this_param = params.pop();
-    hazard = this_param[0];
-    avg_score = this_param[1];
+    hazard = params.pop();
     // [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5]
     if (hazard == 0.05) {
         condText = "Stability Level 1";
