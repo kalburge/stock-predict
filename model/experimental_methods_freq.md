@@ -65,7 +65,7 @@ class Experiment(ABC):
             # budget is not exhausted:
             if n >= self.c[0]:
                 y_d = self.belief[-self.c[0]]
-                y_0 = self.prior_update(y_d, response[1], feedback) #feedback: 0 if reward, 1 if punish, 2 if neutral
+                y_0 = self.prior_update(y_d, response[1], feedback) #feedback: 0 if reward, 1 if punish, 0 if neutral
                 swap = np.random.binomial(1, self.epsilon)
                 s_i = s_i*(swap == 0)-s_i*(swap == 1)
         
@@ -97,17 +97,17 @@ class Experiment(ABC):
     # Belief evolution across trials (based on switching and feedback):
     def prior_update(self, y_d, d, r):
         if r == 2:
-            y_0 = np.log(((1-self.epsilon)*np.exp(y_d)+self.epsilon)/(self.epsilon*np.exp(y_d)+(1-self.epsilon)))
+            y_0 = ((1-self.epsilon)*np.exp(y_d)+self.epsilon)/(self.epsilon*np.exp(y_d)+(1-self.epsilon))
         elif ((r == 0) & (d == 1)) | ((r == 1) & (d == -1)):
             if self.epsilon == 0:
                 y_0 = d*np.inf
             else:
-                y_0 = np.log((1-self.epsilon)/(self.epsilon))
+                y_0 = (1-self.epsilon)/(self.epsilon)
         elif ((r == 0) & (d == -1)) | ((r == 1) & (d == 1)):
             if self.epsilon == 1:
                 y_0 = d*np.inf
             else:
-                y_0 = np.log((self.epsilon)/(1-self.epsilon))
+                y_0 = (self.epsilon)/(1-self.epsilon)
         return y_0
     
     # Perform basic data analysis:
@@ -248,7 +248,8 @@ class RewardMax(Experiment):
     # Belief evolution across trials measured in state likelihood (used for obj.bellmans()):
     def likelihood_prior_update(self, p_d, d, r):
         if r == 2:
-            p_0 = ((1-self.epsilon)*p_d+self.epsilon*(1-p_d))/((1-self.epsilon)*p_d+self.epsilon*(1-p_d)+self.epsilon*p_d+(1-self.epsilon)*(1-p_d))
+            p_0 = ((1-self.epsilon)*np.exp(p_d)+self.epsilon)/((1-self.epsilon)*np.exp(p_d)+self.epsilon+self.epsilon*np.exp(p_d)+(1-self.epsilon))
+                
         if ((r == 0) & (d == 1)) | ((r == 1) & (d == -1)):
             p_0 = (1-self.epsilon) # Pr(s=s_+)/(Pr(s=s_pm))         (Pr(s=s_pm)) = 1
         if ((r == 0) & (d == -1)) | ((r == 1) & (d == 1)):
