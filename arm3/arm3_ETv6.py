@@ -22,14 +22,15 @@ import matplotlib.pyplot as plt
 
 WIN_DIM = (1600,1200); T_STIM = 0.5
 FULLSCR = False
-WINDOW = 14; numSteps = 450; numBlocks = 9;
+WINDOW = 14; numSteps = 50; numBlocks = 9;
 DRIFT = 0.5; SIG = 1; REWARD = 1; PUNISH = -1; 
-params = random.shuffle([[0.05, 0.55], [0.25, 0.55], [0.45, 0.55], [0.05, 0.75], [0.25, 0.75], [0.45, 0.75], [0.05, 0.95], [0.25, 0.95], [0.45, 0.95]]) #format: (eps, q)
-
-
+paramset = [[0.05, 0.55], [0.25, 0.55], [0.45, 0.55], [0.05, 0.75], [0.25, 0.75], [0.45, 0.75], [0.05, 0.95], [0.25, 0.95], [0.45, 0.95]] #format: (eps, q)
+params = random.sample(paramset, len(paramset))
 memory_mode = True
+
 dummy_mode = True
-full_screen = False
+joy_mode = True
+full_screen = True
 use_retina = False
 edf_fname = 'ARM3_ET'
 
@@ -37,6 +38,7 @@ edf_fname = 'ARM3_ET'
 grey = (0.5, 0.5, 0.5)
 greyU = (0.65, 0.65, 0.65)
 greyL = (0.35, 0.35, 0.35)
+window_backend = 'pyglet'
 
 # Switch to the script folder
 script_path = os.path.dirname(sys.argv[0])
@@ -47,8 +49,13 @@ if len(script_path) != 0:
 from psychopy import logging
 logging.console.setLevel(logging.CRITICAL)
 
-
-
+from psychopy.hardware import joystick
+joystick.backend = 'glfw'
+joy = joystick.Joystick(0)
+bttnPress = joy
+print(joy)
+print(bttnPress.getButton(4))
+print(bttnPress.getButton(5))
 
 # Prompt user to specify an EDF data filename
 # before we open a fullscreen window
@@ -57,32 +64,42 @@ dlg_prompt = 'Please enter a file name with 8 or fewer characters\n' + \
              '[letters, numbers, and underscore].'
 
 # loop until we get a valid filename
-while True:
-    dlg = gui.Dlg(dlg_title)
-    dlg.addText(dlg_prompt)
-    dlg.addField('File Name:', edf_fname)
-    # show dialog and wait for OK or Cancel
-    ok_data = dlg.show()
-    if dlg.OK:  # if ok_data is not None
-        print('EDF data filename: {}'.format(ok_data[0]))
-    else:
-        print('user cancelled')
-        core.quit()
-        sys.exit()
+# while True:
+#     dlg = gui.Dlg(dlg_title)
+#     dlg.addText(dlg_prompt)
+#     dlg.addField('File Name:', edf_fname)
+#     # show dialog and wait for OK or Cancel
+#     ok_data = dlg.show()
+#     if dlg.OK:  # if ok_data is not None
+#         print('EDF data filename: {}'.format(ok_data[0]))
+#     else:
+#         print('user cancelled')
+#         core.quit()
+#         sys.exit()
 
-    # get the string entered by the experimenter
-    tmp_str = dlg.data[0]
-    # strip trailing characters, ignore the ".edf" extension
-    edf_fname = tmp_str.rstrip().split('.')[0]
+#     # get the string entered by the experimenter
+#     tmp_str = dlg.data[0]
+#     # strip trailing characters, ignore the ".edf" extension
+#     edf_fname = tmp_str.rstrip().split('.')[0]
 
-    # check if the filename is valid (length <= 8 & no special char)
-    allowed_char = ascii_letters + digits + '_'
-    if not all([c in allowed_char for c in edf_fname]):
-        print('ERROR: Invalid EDF filename')
-    elif len(edf_fname) > 8:
-        print('ERROR: EDF filename should not exceed 8 characters')
-    else:
-        break
+#     # check if the filename is valid (length <= 8 & no special char)
+#     allowed_char = ascii_letters + digits + '_'
+#     if not all([c in allowed_char for c in edf_fname]):
+#         print('ERROR: Invalid EDF filename')
+#     elif len(edf_fname) > 8:
+#         print('ERROR: EDF filename should not exceed 8 characters')
+#     else:
+#         break
+
+A = 0
+B = 1
+X = 2
+Y = 3
+LB = 4
+RB = 5
+
+
+
 
 # Set up a folder to store the EDF data files and the associated resources
 # e.g., files defining the interest areas used in each trial
@@ -186,7 +203,8 @@ el_tracker.sendCommand("button_function 5 'accept_target_fixation'")
 mon = monitors.Monitor('myMonitor', width=53.0, distance=70.0)
 win = visual.Window(fullscr=full_screen,
                     monitor=mon,
-                    winType='pyglet',
+                    screen = 1,
+                    winType=window_backend,
                     units='pix')
 
 # get the native screen resolution used by PsychoPy
@@ -270,22 +288,47 @@ def clear(win):
 def show_msg(win, txt, time=T_STIM, h=None, p=(0,0), wait_kb=True):
     """Show text message stimuli to participants"""
     txt_color = (-0.4,-0.4,-0.4)
-    if not wait_kb:
-        
-        msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
-        
-        msg.draw()
-        win.flip()
-        wait(time)
-        
+    tmp = 0
+    if not joy_mode:
+        if not wait_kb:
+            
+            msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
+            
+            msg.draw()
+            win.flip()
+            wait(time)
+            
+        else:
+            msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
+            msg.draw()
+            win.flip()
+            key = waitKeys()
+            if key[0] == "q":
+                print("Quitting program...")
+                quit()
     else:
-        msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
-        msg.draw()
-        win.flip()
-        key = waitKeys()
-        if key[0] == "q":
-            print("Quitting program...")
-            quit()
+        keypress = False
+        if not wait_kb:
+            
+            msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
+            
+            msg.draw()
+            win.flip()
+            wait(time)
+            
+        else:
+            msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
+            msg.draw()
+            win.flip()
+            while not keypress:
+                if bttnPress.getButton(X):
+                    print("Quitting program...")
+                    quit()
+                if bttnPress.getButton(B):
+                    while bttnPress.getButton(B):
+                        tmp += 1
+                    keypress = True
+
         
         
 
@@ -406,7 +449,7 @@ def generate_stimuli(stock):
 
 
 
-def run_trial(hazard, feed, txt, count):
+def run_trial(hazard, feed, txt):
     el_tracker = pylink.getEYELINK()
     
     experiment_el_time = el_tracker.getCurrentTime()
@@ -440,6 +483,7 @@ def run_trial(hazard, feed, txt, count):
     recording_start = core.getTime()*1000
     print('start recording:', recording_start)
     
+    count = numSteps
     for step in range(numSteps):
         el_step_start = el_tracker.getCurrentTime()
         psy_step_start = core.getTime()*1000
@@ -447,10 +491,11 @@ def run_trial(hazard, feed, txt, count):
         
 #        correct_states.append(stock[-1] > stock[0]); score_tracker.append(score)
         correct_states.append(state > 0); score_tracker.append(score)
-        img_path = 'images/stock_' + str(time) + '.png'
-        img = visual.ImageStim(win, image=img_path, size=None)   
-        counter_txt = visual.TextStim(win, text=count, size = 0.04, pos=(-0.3, -0.25))
-        cond_txt = visual.TextStim(win, text=txt, size = 0.04, pos=(-0.3, 0.2))
+        if time < WINDOW:
+            img_path = 'images/stock_' + str(time) + '.png'
+            img = visual.ImageStim(win, image=img_path, size=None)   
+        counter_txt = visual.TextStim(win, text=count, pos = (-250, -200), color = (-0.4,-0.4,-0.4), units='pix')
+        cond_txt = visual.TextStim(win, text=txt, pos = (-200, 200), color = (-0.4,-0.4,-0.4), units='pix')
         # draw fixation target
         if not dummy_mode:
             fixate = visual.Circle(
@@ -463,8 +508,7 @@ def run_trial(hazard, feed, txt, count):
                 edges=128
             )
             fixate.draw()
-
-
+            
         # show the image, and log a message to mark the onset of the image
         img.draw()
         counter_txt.draw()
@@ -496,85 +540,176 @@ def run_trial(hazard, feed, txt, count):
     
         event.clearEvents()  # clear cached PsychoPy events
         RT = -1  # keep track of the response time
-        key = ''
+        key = 0
         get_keypress = False
         correct = None
-        if time < WINDOW and step < numSteps - 1:
-            while not get_keypress:
+        hold_time = 0
+        if joy_mode:
+            if time < WINDOW - 1 and step < numSteps - 1:
+                while not get_keypress:
 
-                # abort the current trial if the tracker is no longer recording
-                error = el_tracker.isRecording()
-                if error is not pylink.TRIAL_OK:
-                    el_tracker.sendMessage('tracker_disconnected')
-                    abort_trial()
-                    return error
-
-                # check keyboard events
-                for keycode, modifier in event.getKeys(modifiers=True):
-                    # Stop stimulus presentation when the spacebar is pressed
-                    if keycode == 'right':
+                    # abort the current trial if the tracker is no longer recording
+                    error = el_tracker.isRecording()
+                    if error is not pylink.TRIAL_OK:
+                        el_tracker.sendMessage('tracker_disconnected')
+                        abort_trial()
+                        return error
+                        # Stop stimulus presentation when the spacebar is pressed
+                    if bttnPress.getButton(B):
                         keypress_time = core.getTime()*1000
+                        while bttnPress.getButton(B):
+                            hold_time += 1
                         # get response time in ms, PsychoPy report time in sec
                         RT = int((core.getTime()*1000 - img_onset_time))
-                        key = keycode
+                        key = 0
                         get_keypress = True
-
-                    # Abort a trial if "ESCAPE" is pressed
-                    if keycode == 'escape':
-                        el_tracker.sendMessage('trial_skipped_by_user')
-                        # clear the screen
-                        clear(win)
-                        # abort trial
-                        abort_trial()
-                        return pylink.SKIP_TRIAL
-                        
-                    if keycode == 'up' or keycode == 'down':
+                        count -= 1
+                            
+                    elif bttnPress.getButton(RB):
                         keypress_time = core.getTime()*1000
-                        key = keycode
+                        while bttnPress.getButton(B):
+                            hold_time += 1
+                        key = 1
                         # get response time in ms, PsychoPy report time in sec
                         RT = int((core.getTime()*1000 - img_onset_time))
                         correct, score = display_reward(win, key, score, state, feed)
                         get_keypress = True
-
+                        count -= 1
                         
-                    if keycode == 'q':
+                    elif bttnPress.getButton(LB):
+                        keypress_time = core.getTime()*1000
+                        while bttnPress.getButton(B):
+                            hold_time += 1
+                        key = -1
+                        # get response time in ms, PsychoPy report time in sec
+                        RT = int((core.getTime()*1000 - img_onset_time))
+                        correct, score = display_reward(win, key, score, state, feed)
+                        get_keypress = True
+                        count -= 1
+                        
+                    if bttnPress.getButton(X):
+                        terminate_task()
+            else:
+                while not get_keypress:
+
+                    # abort the current trial if the tracker is no longer recording
+                    error = el_tracker.isRecording()
+                    if error is not pylink.TRIAL_OK:
+                        el_tracker.sendMessage('tracker_disconnected')
+                        abort_trial()
+                        return error
+                        # Stop stimulus presentation when the spacebar is pressed
+                            
+                    elif bttnPress.getButton(RB):
+                        keypress_time = core.getTime()*1000
+                        while bttnPress.getButton(B):
+                            hold_time += 1
+                        key = 1
+                        # get response time in ms, PsychoPy report time in sec
+                        RT = int((core.getTime()*1000 - img_onset_time))
+                        correct, score = display_reward(win, key, score, state, feed)
+                        get_keypress = True
+                        count -= 1
+                        
+                    elif bttnPress.getButton(LB):
+                        keypress_time = core.getTime()*1000
+                        while bttnPress.getButton(B):
+                            hold_time += 1
+                        key = -1
+                        # get response time in ms, PsychoPy report time in sec
+                        RT = int((core.getTime()*1000 - img_onset_time))
+                        correct, score = display_reward(win, key, score, state, feed)
+                        get_keypress = True
+                        count -= 1
+                        
+                    if bttnPress.getButton(X):
                         terminate_task()
         else:
-            while not get_keypress:
+            if time < WINDOW - 1 and step < numSteps - 1:
+                while not get_keypress:
 
-                # abort the current trial if the tracker is no longer recording
-                error = el_tracker.isRecording()
-                if error is not pylink.TRIAL_OK:
-                    el_tracker.sendMessage('tracker_disconnected')
-                    abort_trial()
-                    return error
-
-                # check keyboard events
-                for keycode, modifier in event.getKeys(modifiers=True):
-
-                    # Abort a trial if "ESCAPE" is pressed
-                    if keycode == 'escape':
-                        el_tracker.sendMessage('trial_skipped_by_user')
-                        # clear the screen
-                        clear(win)
-                        # abort trial
+                    # abort the current trial if the tracker is no longer recording
+                    error = el_tracker.isRecording()
+                    if error is not pylink.TRIAL_OK:
+                        el_tracker.sendMessage('tracker_disconnected')
                         abort_trial()
-                        return pylink.SKIP_TRIAL
-                        
-                    if keycode == 'up' or keycode == 'down':
-                        keypress_time = core.getTime()*1000
-                        key = keycode
-                        # get response time in ms, PsychoPy report time in sec
-                        RT = int((core.getTime()*1000 - img_onset_time))
-                        correct, score = display_reward(win, key, score, state, feed)
-                        get_keypress = True
-                        
-                    if keycode == 'q':
-                        terminate_task()
-        if key == 'right' and time < WINDOW + 1: 
+                        return error
+
+                    # check keyboard events
+                    for keycode, modifier in event.getKeys(modifiers=True):
+                        # Stop stimulus presentation when the spacebar is pressed
+                        if keycode == 'right':
+                            keypress_time = core.getTime()*1000
+                            # get response time in ms, PsychoPy report time in sec
+                            RT = int((core.getTime()*1000 - img_onset_time))
+                            key = 0
+                            get_keypress = True
+                            count -= 1
+
+                        # Abort a trial if "ESCAPE" is pressed
+                        if keycode == 'escape':
+                            el_tracker.sendMessage('trial_skipped_by_user')
+                            # clear the screen
+                            clear(win)
+                            # abort trial
+                            abort_trial()
+                            return pylink.SKIP_TRIAL
+                            
+                        if keycode == 'up' or keycode == 'down':
+                            keypress_time = core.getTime()*1000
+                            if keycode == 'up':
+                                key = 1
+                            else:
+                                key = -1
+                            # get response time in ms, PsychoPy report time in sec
+                            RT = int((core.getTime()*1000 - img_onset_time))
+                            correct, score = display_reward(win, key, score, state, feed)
+                            get_keypress = True
+                            count -= 1
+
+                            
+                        if keycode == 'q':
+                            terminate_task()
+            else:
+                while not get_keypress:
+
+                    # abort the current trial if the tracker is no longer recording
+                    error = el_tracker.isRecording()
+                    if error is not pylink.TRIAL_OK:
+                        el_tracker.sendMessage('tracker_disconnected')
+                        abort_trial()
+                        return error
+
+                    # check keyboard events
+                    for keycode, modifier in event.getKeys(modifiers=True):
+
+                        # Abort a trial if "ESCAPE" is pressed
+                        if keycode == 'escape':
+                            el_tracker.sendMessage('trial_skipped_by_user')
+                            # clear the screen
+                            clear(win)
+                            # abort trial
+                            abort_trial()
+                            return pylink.SKIP_TRIAL
+                            
+                        if keycode == 'up' or keycode == 'down':
+                            keypress_time = core.getTime()*1000
+                            if keycode == 'up':
+                                key = 1
+                            else:
+                                key = -1
+                            # get response time in ms, PsychoPy report time in sec
+                            RT = int((core.getTime()*1000 - img_onset_time))
+                            correct, score = display_reward(win, key, score, state, feed)
+                            get_keypress = True
+                            count -= 1
+                            
+                        if keycode == 'q':
+                            terminate_task()
+        if key == 0 and time < WINDOW + 1: 
             correct_responses.append(np.nan)
             time += 1
-        elif key == 'up' or key == 'down':
+        elif np.abs(key) == 1:
             correct_responses.append(correct)
             switch = np.random.uniform(0,1) <= hazard
             if switch:
@@ -589,6 +724,8 @@ def run_trial(hazard, feed, txt, count):
         print("EyeLink Task Time:", el_step_end - el_step_start)
         psy_step_end = core.getTime()*1000
         print("PsychoPy Task Time:", psy_step_end - psy_step_start)
+        
+        
     
     end_time = core.getTime()*1000    
     
@@ -612,12 +749,12 @@ def display_reward(win, run, score, state, feed):
     success = draw <= feed
     cor = False
     txt = "No Feedback"
-    if run == 'up' and state > 0:
+    if run == 1 and state > 0:
         if success:
             score += REWARD
             txt = "Correct!"
         cor = True
-    elif run == 'down' and state < 0:
+    elif run == -1 and state < 0:
         if success:
             score += REWARD
             txt = "Correct!"
@@ -661,9 +798,9 @@ genv.setPictureTarget(os.path.join('images', 'fixTarget.bmp'))
 el_start_time = el_tracker.getCurrentTime(); psy_start_time = core.getTime()*1000
 
 
-params_idx = 0
-counter = numSteps
-for block in numBlocks:
+params_idx = 0; block = 0
+for block in range(numBlocks):
+    block += 1
     thisParam = params[params_idx]; eps = thisParam[0]; q = thisParam[1]
     temp = 'LOW Reliability\n'
     if q == 0.75:
@@ -675,9 +812,11 @@ for block in numBlocks:
         condText = temp + 'MEDIUM Volatility'
     elif eps == 0.45:
         condText = temp + 'HIGH Volatility'
-    score = run_trial(eps, q, condText, str(counter))
+    blockMsg = 'Block: ' + str(block) + '\n\nCondition:\n' + condText + '\n\nPress SPACE to continue.'
+    show_msg(win, blockMsg)
+    score = run_trial(eps, q, condText)
     params_idx += 1
-    counter -= 1
+    
 
 el_end_time = el_tracker.getCurrentTime(); psy_end_time = core.getTime()*1000
 
