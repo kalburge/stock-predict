@@ -1,5 +1,6 @@
 /************************** 
  * arm3_eps Test *
+ * author: Ishan Kalburge *
  **************************/
 
 import { core, data, sound, util, visual, hardware } from './lib/psychojs-2022.2.5.js';
@@ -102,7 +103,7 @@ function reward(Q, run, correct_state, score) {
     draw = flipCoin();
     success = (draw <= Q);
     cor = false;
-    txt = "No Feedback";
+    txt = "No Feedback Given";
     if (((run == "up") && (correct_state == 1))) {
         if (success) {
             score += REWARD;
@@ -163,6 +164,9 @@ flowScheduler.add(directionsRoutineEnd());
 flowScheduler.add(detailsRoutineBegin());
 flowScheduler.add(detailsRoutineEachFrame());
 flowScheduler.add(detailsRoutineEnd());
+flowScheduler.add(feedbackExRoutineBegin());
+flowScheduler.add(feedbackExRoutineEachFrame());
+flowScheduler.add(feedbackExRoutineEnd());
 flowScheduler.add(details2RoutineBegin());
 flowScheduler.add(details2RoutineEachFrame());
 flowScheduler.add(details2RoutineEnd());
@@ -175,9 +179,16 @@ flowScheduler.add(vars2RoutineEnd());
 flowScheduler.add(rewardRoutineBegin());
 flowScheduler.add(rewardRoutineEachFrame());
 flowScheduler.add(rewardRoutineEnd());
-flowScheduler.add(exampleRoutineBegin());
-flowScheduler.add(exampleRoutineEachFrame());
-flowScheduler.add(exampleRoutineEnd());
+flowScheduler.add(startTrainingRoutineBegin());
+flowScheduler.add(startTrainingRoutineEachFrame());
+flowScheduler.add(startTrainingRoutineEnd());
+const trainingLoopScheduler = new Scheduler(psychoJS);
+flowScheduler.add(trainingLoopBegin(trainingLoopScheduler));
+flowScheduler.add(trainingLoopScheduler);
+flowScheduler.add(trainingLoopEnd);
+flowScheduler.add(beginRoutineBegin());
+flowScheduler.add(beginRoutineEachFrame());
+flowScheduler.add(beginRoutineEnd());
 const blocksLoopScheduler = new Scheduler(psychoJS);
 flowScheduler.add(blocksLoopBegin(blocksLoopScheduler));
 flowScheduler.add(blocksLoopScheduler);
@@ -197,7 +208,8 @@ dialogCancelScheduler.add(quitPsychoJS, '', false);
 psychoJS.start({
   expName: expName,
   expInfo: expInfo,
-  resources: [ {'name': 'eps_task_ex.png', 'path': 'eps_task_ex.png'}
+  resources: [ {name: 'hourglass.png', path: 'hourglass.png'},
+               {name: 'coins.png', path: 'coins.png'}
   ]
 });
 
@@ -232,25 +244,64 @@ async function updateInfo() {
   return Scheduler.Event.NEXT;
 }
 
-
+const numSteps = 370;
+const trainSteps = 50;
+var counterNum = numSteps;
+// const dp_threshold = 311;
+var dp_threshold = 10;
+var avg_score = dp_threshold - Math.round(dp_threshold/2);
+// const param_set = [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5];
+const param_set = [[0.05, 80], [0.1143, 56], [0.1786, 41], [0.2429, 32], [0.3071, 29], [0.3714, 25], [0.4357, 24], [0.5, 24]];
+var numBlocks = param_set.length;
+var params = shuffle(param_set);
+var feedbackRel = 0.3;
+var hazard = 0;
 var instructionsClock;
 var consentClock;
 var directionsClock;
 var detailsClock;
+var feedbackClock;
 var details2Clock;
 var varsClock;
 var vars2Clock;
 var rewardClock;
-var exampleClock;
+var beginClock;
+var displayClock;
+var startTrainingClock;
+var space_to_begin;
+var space_to_continue;
 var consent_text;
 var intro_text;
-var directions_text;
-var details_text;
-var details2_text;
-var vars_text;
-var vars2_text;
-var reward_text;
-var example_img;
+var directions_top_text;
+var directions_side_text;
+var details_top_text;
+var details_side_text;
+var details_top_box;
+var details_side_box;
+var feedback_top_text;
+var feedback_side_text;
+var feedback_top_box;
+var feedback_side_box;
+var details2_top_text;
+var details2_left_text;
+var details2_top_box;
+var details2_right_box;
+var details2_left_box;
+var vars_top_text;
+var vars_left_text;
+var vars_top_box;
+var vars_left_box;
+var vars2_top_text;
+var vars2_left_text;
+var vars2_top_box;
+var vars2_left_box;
+var vars2_center_box;
+var reward_top_text;
+var reward_left_text;
+var reward_top_box;
+var reward_left_box;
+var reward_right_box;
+var startTraining_text;
 var space_bar;
 var presentationClock;
 var stockline1;
@@ -268,29 +319,38 @@ var stockline12;
 var stockline13;
 var plotLim;
 var zeroLine;
+var dummystock;
 var eps_level;
 var eps_dot;
 var low;
 var high;
 var counter;
 var running_score;
-var avg_score = 108;
+var counter_text;
+var counter_img;
+var running_score_text;
+var running_score_img;
+var thresh;
+var thresh_text;
+var counter_bar;
+var score_bar;
+const bar_width = 0.05;
+const bar_height = 0.2;
+const score_bar_pos = 0.4;
+const counter_bar_pos = -1*score_bar_pos;
+const counter_increment = bar_height/numSteps;
+var score_increment = bar_height/(2*avg_score);
+var counter_bar_height = counterNum*counter_increment;
+var score_bar_height = score*score_increment;
+const thresh_height = bar_height*0;
+var thresh_str = 'Benchmark: ' + avg_score.toString();
 var conditions;
-var condText = '';
-var numSteps = 370;
-const param_set = [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5];
-var numBlocks = param_set.length;
-var params = shuffle(param_set);
-var feedbackRel = 0.125;
-var hazard = 0;
-var counterNum = numSteps;
-//var stock_show;
+var condText = 'Stability Level 2';
 var resp;
 var reward_pres;
 var blockDisplay;
 var blockN = 0;
 var displayText;
-// var second_stock;
 var summaryClock;
 var score_display;
 var globalClock;
@@ -301,11 +361,53 @@ async function experimentInit() {
   consentClock = new util.Clock();
   directionsClock = new util.Clock();
   detailsClock = new util.Clock();
+  feedbackClock = new util.Clock();
   details2Clock = new util.Clock();
   varsClock = new util.Clock();
   vars2Clock = new util.Clock();
   rewardClock = new util.Clock();
-  exampleClock = new util.Clock();
+  beginClock = new util.Clock();
+  displayClock = new util.Clock();
+  startTrainingClock = new util.Clock();
+  
+  space_to_continue = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'space_to_continue',
+    text: "Press SPACE to continue.",
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [0, -0.4], height: 0.05,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  space_to_begin = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'space_to_begin',
+    text: "Press SPACE to BEGIN the task.",
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [0, 0], height: 0.05,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  
+  startTraining_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'startTraining_text',
+    text: "Press SPACE to begin a TRAINING BLOCK.\nAs a reminder:\n\n1) Press RIGHT to sample another time step of stock-market data.\n2) Press UP if you think that the final stock price will be HIGHER than the initial.\n3) Press DOWN if you think that the final stock price will be LOWER than the initial.",
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [0, 0], height: 0.05,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  
   consent_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'consent_text',
@@ -321,10 +423,10 @@ async function experimentInit() {
   intro_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'intro_text',
-    text: "Instructions (pg. 1 of 7): OVERVIEW\n\nYou are being trained as a day trader to make moment-by-moment stock-market predictions as quickly and accurately as possible.\n\nSpecifically, you will view graphs of stock-market prices fluctuating up and down over time (from the left to the right of the screen). Your task is to determine on each screen whether the stock price will be higher or lower at the end (the right of the screen) than it was at the beginning (the left of the screen). Assume it is impossible for the stock price to be the same at the end.\n\nPress SPACE to continue.",
+    text: "In this experiment, you are being trained as a day trader to make moment-by-moment stock-market predictions as quickly and accurately as possible.\n\nSpecifically, you will view graphs of stock-market prices fluctuating up and down over time (from the left to the right of the screen). Your task is to determine for each trial whether the final stock price will be higher or lower than the initial stock price.\n\nRead each instruction screen CAREFULLY; you will NOT be able to return to a previous screen.\n\nPress SPACE to continue.",
     font: 'Open Sans',
     units: undefined, 
-    pos: [0, 0], height: 0.04,  wrapWidth: undefined, ori: 0.0,
+    pos: [0, 0], height: 0.045,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
     color: new util.Color('white'),  opacity: undefined,
     depth: 0.0 
@@ -332,87 +434,351 @@ async function experimentInit() {
   
   
   
-  directions_text = new visual.TextStim({
-    win: psychoJS.window,
-    name: 'directions_text',
-    text: "Instructions (pg. 2 of 7): POSSIBLE ACTIONS\n\nFor each time step, you can choose one of three actions:\n\n1)    Press RIGHT to sample another time step of stock-market data.\n2)    Press UP if you think that the stock price at the end will be HIGHER than at the beginning.\n3)    Press DOWN if you think that the stock price at the end will be LOWER than at the beginning.\n\nPress SPACE to continue.",
-    font: 'Open Sans',
-    units: undefined, 
-    pos: [0, 0], height: 0.05,  wrapWidth: undefined, ori: 0.0,
-    languageStyle: 'LTR',
-    color: new util.Color('white'),  opacity: undefined,
-    depth: 0.0 
-  });
-  
-  
-    details_text = new visual.TextStim({
+  directions_top_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'details_text',
-    text: "Instructions (pg. 3 of 7): TRIALS\n\nEach screen will show a trial consisting of UP TO 13 data points; your job will be to predict where you think the final price on the 14th time step will be. You must commit to an UP or DOWN choice after the 13th time step, if you have not done so already; if you commit before then, the trial will end and you will not be able to see the remaining data points.\n\nOnce you commit to a choice on a trial, you will typically (but not always) be given immediate feedback about whether your choice was correct or not.\n\nPress SPACE to continue.",
+    text: "Your GOAL is to predict whether a particular stock price will be higher or lower at the end of a trial than at the beginning of the trial. Each trial consists of up to 13 time steps.",
     font: 'Open Sans',
     units: undefined, 
-    pos: [0, 0], height: 0.045,  wrapWidth: undefined, ori: 0.0,
+    pos: [0, 0.4], height: 0.035,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
     color: new util.Color('white'),  opacity: undefined,
     depth: 0.0 
   });
   
-    details2_text = new visual.TextStim({
+  directions_side_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'directions_text',
+    text: "",
+    font: 'Open Sans',
+    units: undefined, 
+    alignText: 'left',
+    pos: [-0.6, 0], height: 0.025,  wrapWidth: 0.24, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  
+  details_top_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'directions_text',
+    text: "For each time step, you can choose one of 3 actions.",
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [0, 0.4], height: 0.05,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  details_side_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'directions_text',
+    text: "1) Press RIGHT to sample another time step of stock-market data.\n2) Press UP if you think that the final stock price will be HIGHER than the intial.\n3) Press DOWN if you think that the final stock price will be LOWER than the initial.",
+    font: 'Open Sans',
+    units: undefined, 
+    alignText: 'left', 
+    pos: [-0.6, 0], height: 0.025,  wrapWidth: 0.24, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  
+    
+  
+  details_top_box = new visual.Rect ({
+    win: psychoJS.window, name: 'top_box', 
+    width: 1.05, height: 0.13,
+    ori: 0.0, pos: [0, 0.4],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('red'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  details_side_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box', 
+    width: 0.3, height: 0.45,
+    ori: 0.0, pos: [-0.6, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('red'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+    
+    feedback_top_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'feedback1',
+    text: "You must commit to an UP or DOWN choice within the first 13 time steps. Once you commit, the trial will end, and you will not be able to see the remaining data points.",
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [0, 0.4], height: 0.03,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  feedback_side_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'directions_text',
+    text: "However, on some, but not all, trials, you will receive explicit written feedback about your choice on that trial. Specifically, you will SOMETIMES see 'Correct!' for correct choices and 'Incorrect!' for incorrect choices. Otherwise, you will be shown ‘No Feedback Given.’",
+    font: 'Open Sans',
+    units: undefined,  
+    alignText: 'left',
+    pos: [-0.6, 0], height: 0.026,  wrapWidth: 0.24, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  feedback_top_box = new visual.Rect ({
+    win: psychoJS.window, name: 'top_box', 
+    width: 1.05, height: 0.13,
+    ori: 0.0, pos: [0, 0.4],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('yellow'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  feedback_side_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box', 
+    width: 0.3, height: 0.45,
+    ori: 0.0, pos: [-0.6, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('yellow'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  
+  
+    details2_top_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'details2_text',
-    text: "Instructions (pg. 4 of 7): BLOCKS\n\nImportantly, your training for a given set of conditions (i.e. a particular stock) will end after you have used up a fixed number of time samples equal to " + numSteps.toString() + ". The number of remaining time samples will always be shown at the bottom-left corner.\n\nNote that using more samples on a given trial gives you more data points and thus generally supports more accurate choices but also gives you fewer opportunities to make choices and potentially receive reward. Also note that you are penalized for incorrect responses, so you must be accurate in order to maximize your final score.\n\nPress SPACE to continue.",
+    text: "\n\nYour training for a given set of conditions (block) will end after you have used up " + numSteps.toString() + " steps. A step tracker will be displayed on the LEFT. There will be 8 total blocks.",
     font: 'Open Sans',
     units: undefined, 
-    pos: [0, 0], height: 0.045,  wrapWidth: undefined, ori: 0.0,
+    pos: [0, 0.45], height: 0.035,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
     color: new util.Color('white'),  opacity: undefined,
     depth: 0.0 
   });
   
-    vars_text = new visual.TextStim({
+  details2_left_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'details_text',
+    text: "Note that using more samples on a given trial gives you more data points and thus generally supports more accurate choices but also gives you fewer opportunities to make choices and potentially receive reward. Also note that you are PENALIZED for incorrect responses.",
+    font: 'Open Sans',
+    units: undefined,  
+    alignText: 'left',
+    pos: [0.6, 0], height: 0.03,  wrapWidth: 0.25, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+  
+  details2_top_box = new visual.Rect ({
+    win: psychoJS.window, name: 'top_box2', 
+    width: 1.05, height: 0.14,
+    ori: 0.0, pos: [0, 0.41],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('cyan'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  details2_right_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: 0.3, height: 0.55,
+    ori: 0.0, pos: [0.6, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('cyan'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  details2_left_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: bar_width + 0.03, height: counter_bar_height+0.15,
+    ori: 0.0, pos: [counter_bar_pos, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('cyan'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+    vars_top_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'vars_text',
-    text: "Instructions (pg. 5 of 7): FEEDBACK FREQUENCY\n\nSometimes, but not always, you will receive instant feedback about your performance after you make a decision between UP or DOWN. Feedback comes in the form of 'Correct!' for correct choices, 'Incorrect!' for incorrect choices, and 'No Feedback!' when you are unlucky.\n\nPress SPACE to continue.",
+    text: "In this experiment, you will receive explicit written feedback 30% of the time.",
     font: 'Open Sans',
-    units: undefined, 
-    pos: [0, 0], height: 0.05,  wrapWidth: undefined, ori: 0.0,
+    pos: [0, 0.41], height: 0.04,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
     color: new util.Color('white'),  opacity: undefined,
-    depth: 0.0 
+    depth: 0.0
   });
   
-  
-    vars2_text = new visual.TextStim({
+  vars_left_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'vars_text',
-    text: "Instructions (pg. 6 of 7): STABILITY\n\nIn this experiment, we will be manipulating the stability for each block of " + numSteps.toString() + " time samples. There will be 8 stability levels (ranging from low to high & shown on a slider in the upper left corner).\n\nThe stability of a block determines how consistent the true state of the final price (the correct answer, up or down) is across trials in a block. High stability indicates that the correct final state (up or down) will tend to be the same from trial to trial (so you may find yourself selecting UP or DOWN several times in a row); low stability indicates that the final state tends to change frequently between trials.\n\nPress SPACE to continue.",
+    text: "Otherwise, you will see 'No Feedback Given,' regardless of the accuracy of your choice.",
     font: 'Open Sans',
-    units: undefined, 
-    pos: [0, 0], height: 0.045,  wrapWidth: undefined, ori: 0.0,
+    units: undefined,  
+    alignText: 'left',
+    pos: [-0.6, 0], height: 0.035,  wrapWidth: 0.25, ori: 0.0,
     languageStyle: 'LTR',
     color: new util.Color('white'),  opacity: undefined,
-    depth: 0.0 
+    depth: 0.0
   });
   
-    reward_text = new visual.TextStim({
+  vars_top_box = new visual.Rect ({
+    win: psychoJS.window, name: 'top_box2', 
+    width: 1.05, height: 0.11,
+    ori: 0.0, pos: [0, 0.41],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('greenyellow'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  vars_left_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: 0.3, height: 0.3,
+    ori: 0.0, pos: [-0.6, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('greenyellow'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  
+    vars2_top_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'vars_text',
+    text: "We will be manipulating the level of stability for each of the 8 blocks of " + numSteps.toString() + " steps. The levels range from low to high and will be shown on the slider below.",
+    font: 'Open Sans',
+    pos: [0, 0.4], height: 0.04,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0
+  });
+  
+  
+  vars2_left_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'vars_text',
+    text: "The stability of a block determines how consistent the state of the final price (UP or DOWN) is across trials in a block. High stability indicates that the correct final state will tend to be the same from trial to trial (so you may tend to select UP or DOWN several times in a row); low stability indicates that the final state tends to change frequently between trials.",
+    font: 'Open Sans',
+    units: undefined,  
+    alignText: 'left',
+    pos: [-0.6, 0], height: 0.027,  wrapWidth: 0.25, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0
+  });
+  
+  
+  vars2_top_box = new visual.Rect ({
+    win: psychoJS.window, name: 'top_box2', 
+    width: 1.05, height: 0.15,
+    ori: 0.0, pos: [0, 0.4],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('orange'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  vars2_left_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: 0.3, height: 0.6,
+    ori: 0.0, pos: [-0.6, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('orange'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  vars2_center_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: 0.23, height: 0.05,
+    ori: 0.0, pos: [-0.21, 0.2625],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('orange'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+    
+    reward_top_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'reward_text',
-    text: "Instructions (pg. 7 of 7): REWARDS\n\nYou will have the opportunity to be rewarded based on your final score. Correct answers earn you +1 points, incorrect answers earn you -1 points, and No feedback trials do not affect your score.\n\nA running total score will be displayed in the top right along with an average BENCHMARK score. If you exceed this benchmark, you will receive a cash bonus.\n\nPress SPACE to see an example of the task. Please study carefully!",
+    text: "A score tracker will be shown on the RIGHT, along with a benchmark score. If you exceed this benchmark, you will receive a cash bonus.",
     font: 'Open Sans',
     units: undefined, 
-    pos: [0, 0], height: 0.05,  wrapWidth: undefined, ori: 0.0,
+    pos: [0, 0.4], height: 0.04,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
     color: new util.Color('white'),  opacity: undefined,
-    depth: 0.0 
+    depth: 0.0
   });
   
-  example_img = new visual.ImageStim({
-      win: psychoJS.window,
-      name: 'example_img',
-      image: 'eps_task_ex.png',
-      ori : 0, pos : [0, 0], size : undefined,
-    color : new util.Color([1, 1, 1]), opacity : 1
-  })
+  
+  reward_left_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'vars_text',
+    text: "'Correct!' trials earn you +1 points, 'Incorrect!' trials earn you -1 points, and 'No Feedback Given' trials do not affect your score.",
+    font: 'Open Sans',
+    units: undefined, 
+    alignText: 'left', 
+    pos: [-0.6, 0], height: 0.04,  wrapWidth: 0.25, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0
+  });
+  
+  reward_top_box = new visual.Rect ({
+    win: psychoJS.window, name: 'top_box2', 
+    width: 1.05, height: 0.15,
+    ori: 0.0, pos: [0, 0.4],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('magenta'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  reward_left_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: 0.3, height: 0.52,
+    ori: 0.0, pos: [-0.6, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('magenta'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+
+  reward_right_box = new visual.Rect ({
+    win: psychoJS.window, name: 'side_box2', 
+    width: bar_width + 0.17, height: counter_bar_height+0.15,
+    ori: 0.0, pos: [score_bar_pos+0.07, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('magenta'),
+    opacity: undefined, depth: -7, interpolate: true,
+  });
+  
+  dummystock = new visual.ShapeStim ({
+    win: psychoJS.window, name: 'dummystock', 
+    vertices: [[(- Math.round(14/2))/10, 0],[(- Math.round(14/2))/10 + 0.1, 0.1]],
+    ori: 0.0, pos: [0, 0],
+    lineWidth: 5.0, 
+    colorSpace: 'rgb',
+    size: [0.5, 0.5],
+    lineColor: new util.Color('white'),
+    fillColor: new util.Color('white'),
+    opacity: undefined, depth: -1, interpolate: true,
+  });
 
   
   space_bar = new core.Keyboard({psychoJS: psychoJS, clock: new util.Clock(), waitForStart: true});
@@ -422,8 +788,6 @@ async function experimentInit() {
   // Run 'Begin Experiment' code from getNormalRV
   const DRIFT = 0.5;
   const SIG = 1;
-  // var stock = 0;
-  var cont = true;
   var stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
   stockline1 = new visual.ShapeStim ({
     win: psychoJS.window, name: 'stockline1', 
@@ -610,6 +974,7 @@ async function experimentInit() {
   eps_dot = new visual.Polygon({
     win: psychoJS.window, name: 'eps_dot',
     colorSpace: 'rgb',
+    pos: [-0.26,0.25],
     radius: 0.005,
     lineColor: new util.Color('white'),
     fillColor: new util.Color('white'),
@@ -650,23 +1015,116 @@ async function experimentInit() {
     text: counterNum,
     font: 'Open Sans',
     units: undefined, 
-    pos: [-0.3, -0.25], height: 0.02,  wrapWidth: undefined, ori: 0.0,
+    pos: [counter_bar_pos, -(bar_height/2 + 0.02)], height: 0.02,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
-    color: new util.Color('white'),  opacity: undefined,
+    color: new util.Color([-0.4, -0.4, -0.4]),  opacity: undefined,
     depth: -7 
+  });
+  
+//   counter_text = new visual.TextStim({
+//     win: psychoJS.window,
+//     name: 'counter_text',
+//     text: 'Steps',
+//     font: 'Open Sans',
+//     units: undefined, 
+//     pos: [counter_bar_pos, (bar_height/2 + 0.02)], height: 0.02,  wrapWidth: undefined, ori: 0.0,
+//     languageStyle: 'LTR',
+//     color: new util.Color([-0.4, -0.4, -0.4]),  opacity: undefined,
+//     depth: -7 
+//   });
+  
+  counter_img = new visual.ImageStim({
+    win : psychoJS.window,
+    name : 'counter_hg', units : undefined, 
+    image : 'hourglass.png', mask : undefined,
+    pos: [counter_bar_pos, (bar_height/2 + 0.035)], size: 0.05,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color([-0.4, -0.4, -0.4]),  opacity: undefined,
+    depth: -7 
+  });
+  
+  counter_bar = new visual.Rect ({
+    win: psychoJS.window, name: 'counter_bar', 
+    width: [1.0, 1.0][0], height: [1.0, 1.0][1],
+    ori: 0.0, pos: [counter_bar_pos, 0],
+    lineWidth: 1.0, 
+    colorSpace: 'rgb',
+    size: [bar_width, bar_height],
+    lineColor: new util.Color([-0.4, -0.4, -0.4]),
+    fillColor: new util.Color([-0.4, -0.4, -0.4]),
+    opacity: undefined, depth: -8, interpolate: true,
   });
   
   running_score = new visual.TextStim({
     win: psychoJS.window,
     name: 'running_score',
-    text: '',
+    text: score.toString(),
     font: 'Open Sans',
     units: undefined, 
-    pos: [0.3, 0.35], height: 0.02,  wrapWidth: undefined, ori: 0.0,
+    pos: [score_bar_pos, -(bar_height/2 + 0.02)], height: 0.02,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
-    color: new util.Color('white'),  opacity: undefined,
+    color: new util.Color('gold'),  opacity: undefined,
     depth: -7 
   });
+  
+//   running_score_text = new visual.TextStim({
+//     win: psychoJS.window,
+//     name: 'running_score_text',
+//     text: 'Score',
+//     font: 'Open Sans',
+//     units: undefined, 
+//     pos: [score_bar_pos, (bar_height/2 + 0.02)], height: 0.02,  wrapWidth: undefined, ori: 0.0,
+//     languageStyle: 'LTR',
+//     color: new util.Color([-0.4, -0.4, -0.4]),  opacity: undefined,
+//     depth: -7 
+//   });
+
+   running_score_img = new visual.ImageStim({
+    win : psychoJS.window,
+    name : 'running_score_coins', units : undefined, 
+    image : 'coins.png', mask : undefined,
+    pos: [score_bar_pos, (bar_height/2 + 0.035)], size: 0.06,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color([-0.4, -0.4, -0.4]),  opacity: undefined,
+    depth: -7 
+  });
+  
+  thresh = new visual.ShapeStim ({
+    win: psychoJS.window, name: 'threshold', 
+    vertices: [[score_bar_pos-0.03, thresh_height], [score_bar_pos+0.03, thresh_height]],
+    ori: 0.0, pos: [0, 0],
+    lineWidth: 2.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('black'),
+    fillColor: new util.Color('black'),
+    opacity: undefined, depth: -1, interpolate: true,
+  });
+  
+  thresh_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'thresh_text',
+    text: thresh_str,
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [score_bar_pos+0.1, thresh_height], height: 0.02,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('black'),  opacity: undefined,
+    depth: -7 
+  });
+  
+  
+    score_bar = new visual.Rect ({
+    win: psychoJS.window, name: 'score_bar', 
+    width: [1.0, 1.0][0], height: [1.0, 1.0][1],
+    ori: 0.0, pos: [score_bar_pos, 0 - (2*avg_score - score)*score_increment/2],
+    size: [bar_width, score_bar_height],
+    lineWidth: 1.0, 
+    colorSpace: 'rgb',
+    lineColor: new util.Color('gold'),
+    fillColor: new util.Color('gold'),
+    opacity: undefined, depth: -8, interpolate: true,
+  });
+
   
   
   conditions = new visual.TextStim({
@@ -707,6 +1165,8 @@ async function experimentInit() {
         color: new util.Color('white'),  opacity: undefined,
         depth: -5.0 
     });
+    
+    
   
   //second_stock = new visual.TextStim({
     //win: psychoJS.window,
@@ -750,11 +1210,14 @@ var instructionsComponents;
 var consentComponents;
 var directionsComponents;
 var detailsComponents;
+var feedbackComponents;
 var details2Components;
 var varsComponents;
 var vars2Components;
 var rewardComponents;
-var exampleComponents;
+var beginComponents;
+var displayComponents;
+var startTrainingComponents;
 // consent text
 function consentRoutineBegin(snapshot) {
   return async function () {
@@ -1022,9 +1485,26 @@ function directionsRoutineBegin(snapshot) {
     _space_bar_allKeys = [];
     // keep track of which components have finished
     directionsComponents = [];
-    directionsComponents.push(directions_text);
+    directionsComponents.push(space_to_continue);
+    directionsComponents.push(directions_top_text);
+    directionsComponents.push(directions_side_text);
+    directionsComponents.push(plotLim);
+    directionsComponents.push(zeroLine);
+    directionsComponents.push(dummystock);
+    directionsComponents.push(counter);
+    directionsComponents.push(running_score);
+    directionsComponents.push(counter_img);
+    directionsComponents.push(running_score_img);
+    directionsComponents.push(thresh);
+    directionsComponents.push(thresh_text);
+    directionsComponents.push(counter_bar);
+    directionsComponents.push(score_bar);
+    directionsComponents.push(conditions);
+    directionsComponents.push(low);
+    directionsComponents.push(high);
+    directionsComponents.push(eps_level);
+    directionsComponents.push(eps_dot);
     directionsComponents.push(space_bar);
-    
     for (const thisComponent of directionsComponents)
       if ('status' in thisComponent)
         thisComponent.status = PsychoJS.Status.NOT_STARTED;
@@ -1042,11 +1522,145 @@ function directionsRoutineEachFrame() {
     // update/draw components on each frame
     
     // *text* updates
-    if (t >= 0.0 && directions_text.status === PsychoJS.Status.NOT_STARTED) {
+    
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      directions_text.tStart = t;  // (not accounting for frame time here)
-      directions_text.frameNStart = frameN;  // exact frame index
-      directions_text.setAutoDraw(true);
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && directions_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      directions_top_text.tStart = t;  // (not accounting for frame time here)
+      directions_top_text.frameNStart = frameN;  // exact frame index
+      directions_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && directions_side_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      directions_side_text.tStart = t;  // (not accounting for frame time here)
+      directions_side_text.frameNStart = frameN;  // exact frame index
+      directions_side_text.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
     }
 
     
@@ -1148,7 +1762,28 @@ function detailsRoutineBegin(snapshot) {
     _space_bar_allKeys = [];
     // keep track of which components have finished
     detailsComponents = [];
-    detailsComponents.push(details_text);
+    detailsComponents.push(space_to_continue);
+    detailsComponents.push(details_top_text);
+    detailsComponents.push(details_side_text);
+    detailsComponents.push(details_top_box);
+    detailsComponents.push(details_side_box);
+    detailsComponents.push(directions_side_text);
+    detailsComponents.push(plotLim);
+    detailsComponents.push(zeroLine);
+    detailsComponents.push(dummystock);
+    detailsComponents.push(counter);
+    detailsComponents.push(running_score);
+    detailsComponents.push(counter_img);
+    detailsComponents.push(running_score_img);
+    detailsComponents.push(thresh);
+    detailsComponents.push(thresh_text);
+    detailsComponents.push(counter_bar);
+    detailsComponents.push(score_bar);
+    detailsComponents.push(conditions);
+    detailsComponents.push(low);
+    detailsComponents.push(high);
+    detailsComponents.push(eps_level);
+    detailsComponents.push(eps_dot);
     detailsComponents.push(space_bar);
     
     for (const thisComponent of detailsComponents)
@@ -1168,11 +1803,165 @@ function detailsRoutineEachFrame() {
     // update/draw components on each frame
     
     // *text* updates
-    if (t >= 0.0 && details_text.status === PsychoJS.Status.NOT_STARTED) {
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      details_text.tStart = t;  // (not accounting for frame time here)
-      details_text.frameNStart = frameN;  // exact frame index
-      details_text.setAutoDraw(true);
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && details_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details_top_text.tStart = t;  // (not accounting for frame time here)
+      details_top_text.frameNStart = frameN;  // exact frame index
+      details_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details_side_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details_side_text.tStart = t;  // (not accounting for frame time here)
+      details_side_text.frameNStart = frameN;  // exact frame index
+      details_side_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details_top_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details_top_box.tStart = t;  // (not accounting for frame time here)
+      details_top_box.frameNStart = frameN;  // exact frame index
+      details_top_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details_side_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details_side_box.tStart = t;  // (not accounting for frame time here)
+      details_side_box.frameNStart = frameN;  // exact frame index
+      details_side_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && directions_side_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      directions_side_text.tStart = t;  // (not accounting for frame time here)
+      directions_side_text.frameNStart = frameN;  // exact frame index
+      directions_side_text.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
     }
 
     
@@ -1258,6 +2047,298 @@ function detailsRoutineEnd(snapshot) {
 
 
 
+// feedbackEx text
+function feedbackExRoutineBegin(snapshot) {
+  return async function () {
+    TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date
+    
+    //--- Prepare to start Routine 'instructions' ---
+    t = 0;
+    detailsClock.reset(); // clock
+    frameN = -1;
+    continueRoutine = true; // until we're told otherwise
+    // update component parameters for each repeat
+    space_bar.keys = undefined;
+    space_bar.rt = undefined;
+    _space_bar_allKeys = [];
+    // keep track of which components have finished
+    feedbackComponents = [];
+    feedbackComponents.push(space_to_continue);
+    feedbackComponents.push(feedback_top_text);
+    feedbackComponents.push(feedback_side_text);
+    feedbackComponents.push(feedback_top_box);
+    feedbackComponents.push(feedback_side_box);
+    feedbackComponents.push(plotLim);
+    feedbackComponents.push(zeroLine);
+    feedbackComponents.push(dummystock);
+    feedbackComponents.push(counter);
+    feedbackComponents.push(running_score);
+    feedbackComponents.push(counter_img);
+    feedbackComponents.push(running_score_img);
+    feedbackComponents.push(thresh);
+    feedbackComponents.push(thresh_text);
+    feedbackComponents.push(counter_bar);
+    feedbackComponents.push(score_bar);
+    feedbackComponents.push(conditions);
+    feedbackComponents.push(low);
+    feedbackComponents.push(high);
+    feedbackComponents.push(eps_level);
+    feedbackComponents.push(eps_dot);
+    feedbackComponents.push(space_bar);
+    
+    for (const thisComponent of feedbackComponents)
+      if ('status' in thisComponent)
+        thisComponent.status = PsychoJS.Status.NOT_STARTED;
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+function feedbackExRoutineEachFrame() {
+  return async function () {
+    //--- Loop for each frame of Routine 'instructions' ---
+    // get current time
+    t = detailsClock.getTime();
+    frameN = frameN + 1;// number of completed frames (so 0 is the first frame)
+    // update/draw components on each frame
+    
+    // *text* updates
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && feedback_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      feedback_top_text.tStart = t;  // (not accounting for frame time here)
+      feedback_top_text.frameNStart = frameN;  // exact frame index
+      feedback_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && feedback_side_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      feedback_side_text.tStart = t;  // (not accounting for frame time here)
+      feedback_side_text.frameNStart = frameN;  // exact frame index
+      feedback_side_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && feedback_top_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      feedback_top_box.tStart = t;  // (not accounting for frame time here)
+      feedback_top_box.frameNStart = frameN;  // exact frame index
+      feedback_top_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && feedback_side_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      feedback_side_box.tStart = t;  // (not accounting for frame time here)
+      feedback_side_box.frameNStart = frameN;  // exact frame index
+      feedback_side_box.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
+    }
+
+    
+    // *space_bar* updates
+    if (t >= 0.0 && space_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      space_bar.tStart = t;  // (not accounting for frame time here)
+      space_bar.frameNStart = frameN;  // exact frame index
+      
+      // keyboard checking is just starting
+      psychoJS.window.callOnFlip(function() { space_bar.clock.reset(); });  // t=0 on next screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.start(); }); // start on screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.clearEvents(); });
+    }
+
+    if (space_bar.status === PsychoJS.Status.STARTED) {
+      let theseKeys = space_bar.getKeys({keyList: ['space'], waitRelease: false});
+      _space_bar_allKeys = _space_bar_allKeys.concat(theseKeys);
+      if (_space_bar_allKeys.length > 0) {
+        space_bar.keys = _space_bar_allKeys[_space_bar_allKeys.length - 1].name;  // just the last key pressed
+        space_bar.rt = _space_bar_allKeys[_space_bar_allKeys.length - 1].rt;
+        // a response ends the routine
+        continueRoutine = false;
+      }
+    }
+    
+    // check for quit (typically the Esc key)
+    if (psychoJS.experiment.experimentEnded || psychoJS.eventManager.getKeys({keyList:['escape']}).length > 0) {
+      return quitPsychoJS('The [Escape] key was pressed. Goodbye!', false);
+    }
+    
+    // check if the Routine should terminate
+    if (!continueRoutine) {  // a component has requested a forced-end of Routine
+      return Scheduler.Event.NEXT;
+    }
+    
+    continueRoutine = false;  // reverts to True if at least one component still running
+    for (const thisComponent of feedbackComponents)
+      if ('status' in thisComponent && thisComponent.status !== PsychoJS.Status.FINISHED) {
+        continueRoutine = true;
+        break;
+      }
+    
+    // refresh the screen if continuing
+    if (continueRoutine) {
+      return Scheduler.Event.FLIP_REPEAT;
+    } else {
+      return Scheduler.Event.NEXT;
+    }
+  };
+}
+
+
+function feedbackExRoutineEnd(snapshot) {
+  return async function () {
+    //--- Ending Routine 'instructions' ---
+    for (const thisComponent of feedbackComponents) {
+      if (typeof thisComponent.setAutoDraw === 'function') {
+        thisComponent.setAutoDraw(false);
+      }
+    }
+    // update the trial handler
+    if (currentLoop instanceof MultiStairHandler) {
+      currentLoop.addResponse(space_bar.corr, level);
+    }
+    psychoJS.experiment.addData('space_bar.keys', space_bar.keys);
+    if (typeof space_bar.keys !== 'undefined') {  // we had a response
+        psychoJS.experiment.addData('space_bar.rt', space_bar.rt);
+        routineTimer.reset();
+        }
+    
+    space_bar.stop();
+    // the Routine "instructions" was not non-slip safe, so reset the non-slip timer
+    routineTimer.reset();
+    
+    // Routines running outside a loop should always advance the datafile row
+    if (currentLoop === psychoJS.experiment) {
+      psychoJS.experiment.nextEntry(snapshot);
+    }
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
 // details2 text
 function details2RoutineBegin(snapshot) {
   return async function () {
@@ -1274,7 +2355,28 @@ function details2RoutineBegin(snapshot) {
     _space_bar_allKeys = [];
     // keep track of which components have finished
     details2Components = [];
-    details2Components.push(details2_text);
+    details2Components.push(space_to_continue);
+    details2Components.push(details2_top_text);
+    details2Components.push(details2_left_text);
+    details2Components.push(details2_top_box);
+    details2Components.push(details2_left_box);
+    details2Components.push(details2_right_box);
+    details2Components.push(plotLim);
+    details2Components.push(zeroLine);
+    details2Components.push(dummystock);
+    details2Components.push(counter);
+    details2Components.push(running_score);
+    details2Components.push(counter_img);
+    details2Components.push(running_score_img);
+    details2Components.push(thresh);
+    // details2Components.push(thresh_text);
+    details2Components.push(counter_bar);
+    details2Components.push(score_bar);
+    details2Components.push(conditions);
+    details2Components.push(low);
+    details2Components.push(high);
+    details2Components.push(eps_level);
+    details2Components.push(eps_dot);
     details2Components.push(space_bar);
     
     for (const thisComponent of details2Components)
@@ -1294,11 +2396,166 @@ function details2RoutineEachFrame() {
     // update/draw components on each frame
     
     // *text* updates
-    if (t >= 0.0 && details2_text.status === PsychoJS.Status.NOT_STARTED) {
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      details2_text.tStart = t;  // (not accounting for frame time here)
-      details2_text.frameNStart = frameN;  // exact frame index
-      details2_text.setAutoDraw(true);
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && details2_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details2_top_text.tStart = t;  // (not accounting for frame time here)
+      details2_top_text.frameNStart = frameN;  // exact frame index
+      details2_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details2_left_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details2_left_text.tStart = t;  // (not accounting for frame time here)
+      details2_left_text.frameNStart = frameN;  // exact frame index
+      details2_left_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details2_top_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details2_top_box.tStart = t;  // (not accounting for frame time here)
+      details2_top_box.frameNStart = frameN;  // exact frame index
+      details2_top_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details2_left_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details2_left_box.tStart = t;  // (not accounting for frame time here)
+      details2_left_box.frameNStart = frameN;  // exact frame index
+      details2_left_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && details2_right_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      details2_right_box.tStart = t;  // (not accounting for frame time here)
+      details2_right_box.frameNStart = frameN;  // exact frame index
+      details2_right_box.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    // if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+    //   // keep track of start time/frame for later
+    //   thresh_text.tStart = t;  // (not accounting for frame time here)
+    //   thresh_text.frameNStart = frameN;  // exact frame index
+    //   thresh_text.setAutoDraw(true);
+    // }
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
     }
 
     
@@ -1400,7 +2657,27 @@ function varsRoutineBegin(snapshot) {
     _space_bar_allKeys = [];
     // keep track of which components have finished
     varsComponents = [];
-    varsComponents.push(vars_text);
+    varsComponents.push(space_to_continue);
+    varsComponents.push(vars_top_text);
+    varsComponents.push(vars_left_text);
+    varsComponents.push(vars_top_box);
+    varsComponents.push(vars_left_box);
+    varsComponents.push(plotLim);
+    varsComponents.push(zeroLine);
+    varsComponents.push(dummystock);
+    varsComponents.push(counter);
+    varsComponents.push(running_score);
+    varsComponents.push(counter_img);
+    varsComponents.push(running_score_img);
+    varsComponents.push(thresh);
+    varsComponents.push(thresh_text);
+    varsComponents.push(counter_bar);
+    varsComponents.push(score_bar);
+    varsComponents.push(conditions);
+    varsComponents.push(low);
+    varsComponents.push(high);
+    varsComponents.push(eps_level);
+    varsComponents.push(eps_dot);
     varsComponents.push(space_bar);
     
     for (const thisComponent of varsComponents)
@@ -1420,11 +2697,159 @@ function varsRoutineEachFrame() {
     // update/draw components on each frame
     
     // *text* updates
-    if (t >= 0.0 && vars_text.status === PsychoJS.Status.NOT_STARTED) {
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      vars_text.tStart = t;  // (not accounting for frame time here)
-      vars_text.frameNStart = frameN;  // exact frame index
-      vars_text.setAutoDraw(true);
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && vars_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars_top_text.tStart = t;  // (not accounting for frame time here)
+      vars_top_text.frameNStart = frameN;  // exact frame index
+      vars_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars_left_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars_left_text.tStart = t;  // (not accounting for frame time here)
+      vars_left_text.frameNStart = frameN;  // exact frame index
+      vars_left_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars_top_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars_top_box.tStart = t;  // (not accounting for frame time here)
+      vars_top_box.frameNStart = frameN;  // exact frame index
+      vars_top_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars_left_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars_left_box.tStart = t;  // (not accounting for frame time here)
+      vars_left_box.frameNStart = frameN;  // exact frame index
+      vars_left_box.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
     }
 
     
@@ -1525,7 +2950,28 @@ function vars2RoutineBegin(snapshot) {
     _space_bar_allKeys = [];
     // keep track of which components have finished
     vars2Components = [];
-    vars2Components.push(vars2_text);
+    vars2Components.push(space_to_continue);
+    vars2Components.push(vars2_top_text);
+    vars2Components.push(vars2_left_text);
+    vars2Components.push(vars2_top_box);
+    vars2Components.push(vars2_left_box);
+    vars2Components.push(vars2_center_box);
+    vars2Components.push(plotLim);
+    vars2Components.push(zeroLine);
+    vars2Components.push(dummystock);
+    vars2Components.push(counter);
+    vars2Components.push(running_score);
+    vars2Components.push(counter_img);
+    vars2Components.push(running_score_img);
+    vars2Components.push(thresh);
+    vars2Components.push(thresh_text);
+    vars2Components.push(counter_bar);
+    vars2Components.push(score_bar);
+    vars2Components.push(conditions);
+    vars2Components.push(low);
+    vars2Components.push(high);
+    vars2Components.push(eps_level);
+    vars2Components.push(eps_dot);
     vars2Components.push(space_bar);
     
     for (const thisComponent of vars2Components)
@@ -1545,11 +2991,164 @@ function vars2RoutineEachFrame() {
     // update/draw components on each frame
     
     // *text* updates
-    if (t >= 0.0 && vars2_text.status === PsychoJS.Status.NOT_STARTED) {
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      vars2_text.tStart = t;  // (not accounting for frame time here)
-      vars2_text.frameNStart = frameN;  // exact frame index
-      vars2_text.setAutoDraw(true);
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && vars2_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars2_top_text.tStart = t;  // (not accounting for frame time here)
+      vars2_top_text.frameNStart = frameN;  // exact frame index
+      vars2_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars2_left_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars2_left_text.tStart = t;  // (not accounting for frame time here)
+      vars2_left_text.frameNStart = frameN;  // exact frame index
+      vars2_left_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars2_top_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars2_top_box.tStart = t;  // (not accounting for frame time here)
+      vars2_top_box.frameNStart = frameN;  // exact frame index
+      vars2_top_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars2_left_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars2_left_box.tStart = t;  // (not accounting for frame time here)
+      vars2_left_box.frameNStart = frameN;  // exact frame index
+      vars2_left_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && vars2_center_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      vars2_center_box.tStart = t;  // (not accounting for frame time here)
+      vars2_center_box.frameNStart = frameN;  // exact frame index
+      vars2_center_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
     }
 
     
@@ -1654,7 +3253,28 @@ function rewardRoutineBegin(snapshot) {
     _space_bar_allKeys = [];
     // keep track of which components have finished
     rewardComponents = [];
-    rewardComponents.push(reward_text);
+    rewardComponents.push(space_to_continue);
+    rewardComponents.push(reward_top_text);
+    rewardComponents.push(reward_left_text);
+    rewardComponents.push(reward_top_box);
+    rewardComponents.push(reward_left_box);
+    rewardComponents.push(reward_right_box);
+    rewardComponents.push(plotLim);
+    rewardComponents.push(zeroLine);
+    rewardComponents.push(dummystock);
+    rewardComponents.push(counter);
+    rewardComponents.push(running_score);
+    rewardComponents.push(counter_img);
+    rewardComponents.push(running_score_img);
+    rewardComponents.push(thresh);
+    rewardComponents.push(thresh_text);
+    rewardComponents.push(counter_bar);
+    rewardComponents.push(score_bar);
+    rewardComponents.push(conditions);
+    rewardComponents.push(low);
+    rewardComponents.push(high);
+    rewardComponents.push(eps_level);
+    rewardComponents.push(eps_dot);
     rewardComponents.push(space_bar);
     
     for (const thisComponent of rewardComponents)
@@ -1674,11 +3294,164 @@ function rewardRoutineEachFrame() {
     // update/draw components on each frame
     
     // *text* updates
-    if (t >= 0.0 && reward_text.status === PsychoJS.Status.NOT_STARTED) {
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      reward_text.tStart = t;  // (not accounting for frame time here)
-      reward_text.frameNStart = frameN;  // exact frame index
-      reward_text.setAutoDraw(true);
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    } 
+    
+    
+    if (t >= 0.0 && reward_top_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      reward_top_text.tStart = t;  // (not accounting for frame time here)
+      reward_top_text.frameNStart = frameN;  // exact frame index
+      reward_top_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && reward_left_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      reward_left_text.tStart = t;  // (not accounting for frame time here)
+      reward_left_text.frameNStart = frameN;  // exact frame index
+      reward_left_text.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && reward_top_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      reward_top_box.tStart = t;  // (not accounting for frame time here)
+      reward_top_box.frameNStart = frameN;  // exact frame index
+      reward_top_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && reward_left_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      reward_left_box.tStart = t;  // (not accounting for frame time here)
+      reward_left_box.frameNStart = frameN;  // exact frame index
+      reward_left_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && reward_right_box.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      reward_right_box.tStart = t;  // (not accounting for frame time here)
+      reward_right_box.frameNStart = frameN;  // exact frame index
+      reward_right_box.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && plotLim.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      plotLim.tStart = t;  // (not accounting for frame time here)
+      plotLim.frameNStart = frameN;  // exact frame index
+      plotLim.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && zeroLine.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      zeroLine.tStart = t;  // (not accounting for frame time here)
+      zeroLine.frameNStart = frameN;  // exact frame index
+      zeroLine.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && dummystock.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      dummystock.tStart = t;  // (not accounting for frame time here)
+      dummystock.frameNStart = frameN;  // exact frame index
+      dummystock.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter.tStart = t;  // (not accounting for frame time here)
+      counter.frameNStart = frameN;  // exact frame index
+      counter.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && running_score.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score.tStart = t;  // (not accounting for frame time here)
+      running_score.frameNStart = frameN;  // exact frame index
+      running_score.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+    
+    
+    if (t >= 0.0 && conditions.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      conditions.tStart = t;  // (not accounting for frame time here)
+      conditions.frameNStart = frameN;  // exact frame index
+      conditions.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && low.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      low.tStart = t;  // (not accounting for frame time here)
+      low.frameNStart = frameN;  // exact frame index
+      low.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && high.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      high.tStart = t;  // (not accounting for frame time here)
+      high.frameNStart = frameN;  // exact frame index
+      high.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_level.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_level.tStart = t;  // (not accounting for frame time here)
+      eps_level.frameNStart = frameN;  // exact frame index
+      eps_level.setAutoDraw(true);
+    }
+    
+    if (t >= 0.0 && eps_dot.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      eps_dot.tStart = t;  // (not accounting for frame time here)
+      eps_dot.frameNStart = frameN;  // exact frame index
+      eps_dot.setAutoDraw(true);
     }
 
     
@@ -1762,14 +3535,15 @@ function rewardRoutineEnd(snapshot) {
   }
 }
 
-// example img
-function exampleRoutineBegin(snapshot) {
+// begin img
+function beginRoutineBegin(snapshot) {
   return async function () {
     TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date
-    
+    score = 0;
+    dp_threshold = 0;
     //--- Prepare to start Routine 'instructions' ---
     t = 0;
-    exampleClock.reset(); // clock
+    beginClock.reset(); // clock
     frameN = -1;
     continueRoutine = true; // until we're told otherwise
     // update component parameters for each repeat
@@ -1777,11 +3551,11 @@ function exampleRoutineBegin(snapshot) {
     space_bar.rt = undefined;
     _space_bar_allKeys = [];
     // keep track of which components have finished
-    exampleComponents = [];
-    exampleComponents.push(example_img);
-    exampleComponents.push(space_bar);
+    beginComponents = [];
+    beginComponents.push(space_to_begin);
+    beginComponents.push(space_bar);
     
-    for (const thisComponent of exampleComponents)
+    for (const thisComponent of beginComponents)
       if ('status' in thisComponent)
         thisComponent.status = PsychoJS.Status.NOT_STARTED;
     return Scheduler.Event.NEXT;
@@ -1789,7 +3563,7 @@ function exampleRoutineBegin(snapshot) {
 }
 
 
-function exampleRoutineEachFrame() {
+function beginRoutineEachFrame() {
   return async function () {
     //--- Loop for each frame of Routine 'instructions' ---
     // get current time
@@ -1797,12 +3571,14 @@ function exampleRoutineEachFrame() {
     frameN = frameN + 1;// number of completed frames (so 0 is the first frame)
     // update/draw components on each frame
     
+
+    
     // *text* updates
-    if (t >= 0.0 && example_img.status === PsychoJS.Status.NOT_STARTED) {
+    if (t >= 0.0 && space_to_begin.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      example_img.tStart = t;  // (not accounting for frame time here)
-      example_img.frameNStart = frameN;  // exact frame index
-      example_img.setAutoDraw(true);
+      space_to_begin.tStart = t;  // (not accounting for frame time here)
+      space_to_begin.frameNStart = frameN;  // exact frame index
+      space_to_begin.setAutoDraw(true);
     }
 
     
@@ -1840,7 +3616,7 @@ function exampleRoutineEachFrame() {
     }
     
     continueRoutine = false;  // reverts to True if at least one component still running
-    for (const thisComponent of exampleComponents)
+    for (const thisComponent of beginComponents)
       if ('status' in thisComponent && thisComponent.status !== PsychoJS.Status.FINISHED) {
         continueRoutine = true;
         break;
@@ -1856,10 +3632,10 @@ function exampleRoutineEachFrame() {
 }
 
 
-function exampleRoutineEnd(snapshot) {
+function beginRoutineEnd(snapshot) {
   return async function () {
     //--- Ending Routine 'instructions' ---
-    for (const thisComponent of exampleComponents) {
+    for (const thisComponent of beginComponents) {
       if (typeof thisComponent.setAutoDraw === 'function') {
         thisComponent.setAutoDraw(false);
       }
@@ -1887,6 +3663,132 @@ function exampleRoutineEnd(snapshot) {
 }
 
 
+// startTraining
+function startTrainingRoutineBegin(snapshot) {
+  return async function () {
+    TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date
+    
+    //--- Prepare to start Routine 'instructions' ---
+    t = 0;
+    startTrainingClock.reset(); // clock
+    frameN = -1;
+    continueRoutine = true; // until we're told otherwise
+    // update component parameters for each repeat
+    space_bar.keys = undefined;
+    space_bar.rt = undefined;
+    _space_bar_allKeys = [];
+    // keep track of which components have finished
+    startTrainingComponents = [];
+    startTrainingComponents.push(startTraining_text);
+    startTrainingComponents.push(space_bar);
+    
+    for (const thisComponent of startTrainingComponents)
+      if ('status' in thisComponent)
+        thisComponent.status = PsychoJS.Status.NOT_STARTED;
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+function startTrainingRoutineEachFrame() {
+  return async function () {
+    //--- Loop for each frame of Routine 'instructions' ---
+    // get current time
+    t = varsClock.getTime();
+    frameN = frameN + 1;// number of completed frames (so 0 is the first frame)
+    // update/draw components on each frame
+    
+    score = 0;
+    
+    
+    // *text* updates
+    if (t >= 0.0 && startTraining_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      startTraining_text.tStart = t;  // (not accounting for frame time here)
+      startTraining_text.frameNStart = frameN;  // exact frame index
+      startTraining_text.setAutoDraw(true);
+    }
+
+    
+    // *space_bar* updates
+    if (t >= 0.0 && space_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      space_bar.tStart = t;  // (not accounting for frame time here)
+      space_bar.frameNStart = frameN;  // exact frame index
+      
+      // keyboard checking is just starting
+      psychoJS.window.callOnFlip(function() { space_bar.clock.reset(); });  // t=0 on next screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.start(); }); // start on screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.clearEvents(); });
+    }
+
+    if (space_bar.status === PsychoJS.Status.STARTED) {
+      let theseKeys = space_bar.getKeys({keyList: ['space'], waitRelease: false});
+      _space_bar_allKeys = _space_bar_allKeys.concat(theseKeys);
+      if (_space_bar_allKeys.length > 0) {
+        space_bar.keys = _space_bar_allKeys[_space_bar_allKeys.length - 1].name;  // just the last key pressed
+        space_bar.rt = _space_bar_allKeys[_space_bar_allKeys.length - 1].rt;
+        // a response ends the routine
+        continueRoutine = false;
+      }
+    }
+    
+    // check for quit (typically the Esc key)
+    if (psychoJS.experiment.experimentEnded || psychoJS.eventManager.getKeys({keyList:['escape']}).length > 0) {
+      return quitPsychoJS('The [Escape] key was pressed. Goodbye!', false);
+    }
+    
+    // check if the Routine should terminate
+    if (!continueRoutine) {  // a component has requested a forced-end of Routine
+      return Scheduler.Event.NEXT;
+    }
+    
+    continueRoutine = false;  // reverts to True if at least one component still running
+    for (const thisComponent of startTrainingComponents)
+      if ('status' in thisComponent && thisComponent.status !== PsychoJS.Status.FINISHED) {
+        continueRoutine = true;
+        break;
+      }
+    
+    // refresh the screen if continuing
+    if (continueRoutine) {
+      return Scheduler.Event.FLIP_REPEAT;
+    } else {
+      return Scheduler.Event.NEXT;
+    }
+  };
+}
+
+
+function startTrainingRoutineEnd(snapshot) {
+  return async function () {
+    //--- Ending Routine 'instructions' ---
+    for (const thisComponent of startTrainingComponents) {
+      if (typeof thisComponent.setAutoDraw === 'function') {
+        thisComponent.setAutoDraw(false);
+      }
+    }
+    // update the trial handler
+    if (currentLoop instanceof MultiStairHandler) {
+      currentLoop.addResponse(space_bar.corr, level);
+    }
+    psychoJS.experiment.addData('space_bar.keys', space_bar.keys);
+    if (typeof space_bar.keys !== 'undefined') {  // we had a response
+        psychoJS.experiment.addData('space_bar.rt', space_bar.rt);
+        routineTimer.reset();
+        }
+    
+    space_bar.stop();
+    // the Routine "instructions" was not non-slip safe, so reset the non-slip timer
+    routineTimer.reset();
+    
+    // Routines running outside a loop should always advance the datafile row
+    if (currentLoop === psychoJS.experiment) {
+      psychoJS.experiment.nextEntry(snapshot);
+    }
+    return Scheduler.Event.NEXT;
+  }
+}
 
 var blocks;
 function blocksLoopBegin(blocksLoopScheduler, snapshot) {
@@ -1907,6 +3809,9 @@ function blocksLoopBegin(blocksLoopScheduler, snapshot) {
     for (const thisBlock of blocks) {
       snapshot = blocks.getSnapshot();
       blocksLoopScheduler.add(importConditions(snapshot));
+      blocksLoopScheduler.add(displayRoutineBegin());
+      blocksLoopScheduler.add(displayRoutineEachFrame());
+      blocksLoopScheduler.add(displayRoutineEnd());
       const stepsLoopScheduler = new Scheduler(psychoJS);
       blocksLoopScheduler.add(stepsLoopBegin(stepsLoopScheduler, snapshot));
       blocksLoopScheduler.add(stepsLoopScheduler);
@@ -1919,44 +3824,178 @@ function blocksLoopBegin(blocksLoopScheduler, snapshot) {
 }
 
 
-var steps;
-function stepsLoopBegin(stepsLoopScheduler, snapshot) {
-  return async function() {
-    TrialHandler.fromSnapshot(snapshot); // update internal variables (.thisN etc) of the loop
+// display img
+var current_param;
+function displayRoutineBegin(snapshot) {
+  return async function () {
+    TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date
     counterNum = numSteps;
+    cont = true;
     currentHour = 0;
     blockN += 1;
     stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
-    hazard = params.pop();
+    current_param = params.pop();
+    hazard = current_param[0];
+    dp_threshold += current_param[1];
+    avg_score = dp_threshold - Math.round(dp_threshold/2);
+    score_increment = bar_height/(2*avg_score);
+    score_bar_height = score*score_increment;
+    thresh_str = 'Benchmark: ' + avg_score.toString();
     // [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5]
-    if (hazard == 0.05) {
+    if (hazard == 0.5) {
         condText = "Stability Level 1";
         eps_dot.setPos([-0.28,0.25]);
-    } else if (hazard == 0.1143) {
+    } else if (hazard == 0.4357) {
         condText = "Stability Level 2";
         eps_dot.setPos([-0.26,0.25]);
-    } else if (hazard == 0.1786) {
+    } else if (hazard == 0.3714) {
         condText = "Stability Level 3";
         eps_dot.setPos([-0.24,0.25]);
-    } else if (hazard == 0.2429) {
+    } else if (hazard == 0.3071) {
         condText = "Stability Level 4";
         eps_dot.setPos([-0.22,0.25]);
-    } else if (hazard == 0.3071) {
+    } else if (hazard == 0.2429) {
         condText = "Stability Level 5";
         eps_dot.setPos([-0.2,0.25]);
-    } else if (hazard == 0.3714) {
+    } else if (hazard == 0.1786) {
         condText = "Stability Level 6";
         eps_dot.setPos([-0.18,0.25]);
-    } else if (hazard == 0.4357) {
+    } else if (hazard == 0.1143) {
         condText = "Stability Level 7";
         eps_dot.setPos([-0.16,0.25]);
-    } else if (hazard == 0.5) {
+    } else if (hazard == 0.05) {
         condText = "Stability Level 8";
         eps_dot.setPos([-0.14,0.25]);
     }
 
-    displayText = "Block " + blockN.toString() + "\n\nRunning total score: " + score.toString() + "\n\n" + condText;
+    displayText = "Block " + blockN.toString() + "\n\nRunning total score: " + score.toString() + "\n\n" + condText + "\n\nPress SPACE to continue.";
     blockDisplay.setText(displayText);
+    //--- Prepare to start Routine 'instructions' ---
+    t = 0;
+   displayClock.reset(); // clock
+    frameN = -1;
+    continueRoutine = true; // until we're told otherwise
+    // update component parameters for each repeat
+    space_bar.keys = undefined;
+    space_bar.rt = undefined;
+    _space_bar_allKeys = [];
+    // keep track of which components have finished
+    displayComponents = [];
+    displayComponents.push(blockDisplay);
+    displayComponents.push(space_bar);
+    
+    for (const thisComponent of displayComponents)
+      if ('status' in thisComponent)
+        thisComponent.status = PsychoJS.Status.NOT_STARTED;
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+function displayRoutineEachFrame() {
+  return async function () {
+    //--- Loop for each frame of Routine 'instructions' ---
+    // get current time
+    t = varsClock.getTime();
+    frameN = frameN + 1;// number of completed frames (so 0 is the first frame)
+    // update/draw components on each frame
+    
+    
+    // *text* updates
+    if (t >= 0.0 && blockDisplay.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      blockDisplay.tStart = t;  // (not accounting for frame time here)
+      blockDisplay.frameNStart = frameN;  // exact frame index
+      blockDisplay.setAutoDraw(true);
+    }
+
+    
+    // *space_bar* updates
+    if (t >= 0.0 && space_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      space_bar.tStart = t;  // (not accounting for frame time here)
+      space_bar.frameNStart = frameN;  // exact frame index
+      
+      // keyboard checking is just starting
+      psychoJS.window.callOnFlip(function() { space_bar.clock.reset(); });  // t=0 on next screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.start(); }); // start on screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.clearEvents(); });
+    }
+
+    if (space_bar.status === PsychoJS.Status.STARTED) {
+      let theseKeys = space_bar.getKeys({keyList: ['space'], waitRelease: false});
+      _space_bar_allKeys = _space_bar_allKeys.concat(theseKeys);
+      if (_space_bar_allKeys.length > 0) {
+        space_bar.keys = _space_bar_allKeys[_space_bar_allKeys.length - 1].name;  // just the last key pressed
+        space_bar.rt = _space_bar_allKeys[_space_bar_allKeys.length - 1].rt;
+        // a response ends the routine
+        continueRoutine = false;
+      }
+    }
+    
+    // check for quit (typically the Esc key)
+    if (psychoJS.experiment.experimentEnded || psychoJS.eventManager.getKeys({keyList:['escape']}).length > 0) {
+      return quitPsychoJS('The [Escape] key was pressed. Goodbye!', false);
+    }
+    
+    // check if the Routine should terminate
+    if (!continueRoutine) {  // a component has requested a forced-end of Routine
+      return Scheduler.Event.NEXT;
+    }
+    
+    continueRoutine = false;  // reverts to True if at least one component still running
+    for (const thisComponent of displayComponents)
+      if ('status' in thisComponent && thisComponent.status !== PsychoJS.Status.FINISHED) {
+        continueRoutine = true;
+        break;
+      }
+    
+    // refresh the screen if continuing
+    if (continueRoutine) {
+      return Scheduler.Event.FLIP_REPEAT;
+    } else {
+      return Scheduler.Event.NEXT;
+    }
+  };
+}
+
+
+function displayRoutineEnd(snapshot) {
+  return async function () {
+    //--- Ending Routine 'instructions' ---
+    for (const thisComponent of displayComponents) {
+      if (typeof thisComponent.setAutoDraw === 'function') {
+        thisComponent.setAutoDraw(false);
+      }
+    }
+    // update the trial handler
+    if (currentLoop instanceof MultiStairHandler) {
+      currentLoop.addResponse(space_bar.corr, level);
+    }
+    psychoJS.experiment.addData('space_bar.keys', space_bar.keys);
+    if (typeof space_bar.keys !== 'undefined') {  // we had a response
+        psychoJS.experiment.addData('space_bar.rt', space_bar.rt);
+        routineTimer.reset();
+        }
+    
+    space_bar.stop();
+    // the Routine "instructions" was not non-slip safe, so reset the non-slip timer
+    routineTimer.reset();
+    
+    // Routines running outside a loop should always advance the datafile row
+    if (currentLoop === psychoJS.experiment) {
+      psychoJS.experiment.nextEntry(snapshot);
+    }
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+var steps;
+function stepsLoopBegin(stepsLoopScheduler, snapshot) {
+  return async function() {
+    TrialHandler.fromSnapshot(snapshot); // update internal variables (.thisN etc) of the loop
+    
     // set up handler to look after randomisation of conditions etc
     steps = new TrialHandler({
       psychoJS: psychoJS,
@@ -2015,6 +4054,77 @@ function stepsLoopEndIteration(scheduler, snapshot) {
   };
 }
 
+var train;
+function trainingLoopBegin(trainLoopScheduler, snapshot) {
+  return async function() {
+    TrialHandler.fromSnapshot(snapshot); // update internal variables (.thisN etc) of the loop
+    counterNum = trainSteps;
+    currentHour = 0;
+    score = 0;
+    stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
+    hazard = 0.2429;
+    condText = "Stability Level 5";
+    eps_dot.setPos([-0.2,0.25]);
+    // [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5]
+
+    // set up handler to look after randomisation of conditions etc
+    train = new TrialHandler({
+      psychoJS: psychoJS,
+      nReps: trainSteps, method: TrialHandler.Method.RANDOM,
+      extraInfo: expInfo, originPath: undefined,
+      trialList: undefined,
+      seed: undefined, name: 'train'
+    });
+    psychoJS.experiment.addLoop(train); // add the loop to the experiment
+    currentLoop = train;  // we're now the current loop
+    
+    // Schedule all the trials in the trialList:
+    for (const thisTrain of train) {
+      snapshot = train.getSnapshot();
+      trainLoopScheduler.add(importConditions(snapshot));
+      trainLoopScheduler.add(presentationRoutineBegin(snapshot));
+      trainLoopScheduler.add(presentationRoutineEachFrame());
+      trainLoopScheduler.add(presentationRoutineEnd(snapshot));
+      trainLoopScheduler.add(trainingLoopEndIteration(trainLoopScheduler, snapshot));
+    }
+    
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+async function trainingLoopEnd() {
+  // terminate loop
+  psychoJS.experiment.removeLoop(train);
+  // update the current loop from the ExperimentHandler
+  if (psychoJS.experiment._unfinishedLoops.length>0)
+    currentLoop = psychoJS.experiment._unfinishedLoops.at(-1);
+  else
+    currentLoop = psychoJS.experiment;  // so we use addData from the experiment
+  return Scheduler.Event.NEXT;
+}
+
+
+function trainingLoopEndIteration(scheduler, snapshot) {
+  // ------Prepare for next entry------
+  
+  return async function () {
+    if (typeof snapshot !== 'undefined') {
+      // ------Check if user ended loop early------
+      if (snapshot.finished) {
+        // Check for and save orphaned data
+        if (psychoJS.experiment.isEntryEmpty()) {
+          psychoJS.experiment.nextEntry(snapshot);
+        }
+        scheduler.stop();
+      } else {
+        psychoJS.experiment.nextEntry(snapshot);
+      }
+    return Scheduler.Event.NEXT;
+    }
+  };
+}
+
 
 async function blocksLoopEnd() {
   // terminate loop
@@ -2053,6 +4163,7 @@ function blocksLoopEndIteration(scheduler, snapshot) {
 //var stock;
 var _resp_allKeys;
 var presentationComponents;
+var score_height;
 function presentationRoutineBegin(snapshot) {
   return async function () {
     TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date
@@ -2070,7 +4181,22 @@ function presentationRoutineBegin(snapshot) {
     _resp_allKeys = [];
     reward_pres.setText(txt);
     counter.setText(counterNum);
-    running_score.setText('Running Score: ' + score.toString() + '\nBenchmark Score: ' + avg_score.toString())
+    counter_bar.setSize([bar_width, counterNum*counter_increment]);
+    counter_bar.setPos([counter_bar_pos, 0 - (numSteps - counterNum)*counter_increment/2])
+    if (score > 2*avg_score) {
+        score_height = 2*avg_score*score_increment;
+        score_bar.setPos([score_bar_pos, 0 - (2*avg_score - 2*avg_score)*score_increment/2]);
+    }
+    if (score >= 0) {
+        score_height = score*score_increment;
+        score_bar.setPos([score_bar_pos, 0 - (2*avg_score - score)*score_increment/2]);
+    } else {
+        score_height = 0*score_increment;
+        score_bar.setPos([score_bar_pos, 0 - (2*avg_score - 0)*score_increment/2]);
+    }
+    score_bar.setSize([bar_width, score_height]);
+    thresh_text.setText(thresh_str);
+    running_score.setText(score.toString())
     conditions.setText(condText);
     // keep track of which components have finished
     presentationComponents = [];
@@ -2087,12 +4213,25 @@ function presentationRoutineBegin(snapshot) {
     presentationComponents.push(stockline11);
     presentationComponents.push(stockline12);
     presentationComponents.push(stockline13);
-    //presentationComponents.push(stock_show);
     presentationComponents.push(resp);
     presentationComponents.push(reward_pres);
-    presentationComponents.push(blockDisplay);
-    //presentationComponents.push(second_stock);
-    
+    // presentationComponents.push(blockDisplay);
+    presentationComponents.push(plotLim);
+    presentationComponents.push(zeroLine);
+    presentationComponents.push(counter);
+    presentationComponents.push(running_score);
+    presentationComponents.push(counter_img);
+    presentationComponents.push(running_score_img);
+    presentationComponents.push(thresh);
+    presentationComponents.push(thresh_text);
+    presentationComponents.push(counter_bar);
+    presentationComponents.push(score_bar);
+    presentationComponents.push(conditions);
+    presentationComponents.push(low);
+    presentationComponents.push(high);
+    presentationComponents.push(eps_level);
+    presentationComponents.push(eps_dot);
+
     for (const thisComponent of presentationComponents)
       if ('status' in thisComponent)
         thisComponent.status = PsychoJS.Status.NOT_STARTED;
@@ -2124,12 +4263,14 @@ function presentationRoutineEachFrame() {
       zeroLine.setAutoDraw(true);
     }
     
+    
     if (((cont == true)) && counter.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
       counter.tStart = t;  // (not accounting for frame time here)
       counter.frameNStart = frameN;  // exact frame index
       counter.setAutoDraw(true);
     }
+   
     
     if (((cont == true)) && running_score.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
@@ -2137,6 +4278,50 @@ function presentationRoutineEachFrame() {
       running_score.frameNStart = frameN;  // exact frame index
       running_score.setAutoDraw(true);
     }
+    
+    if (((cont == true)) && counter_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_bar.tStart = t;  // (not accounting for frame time here)
+      counter_bar.frameNStart = frameN;  // exact frame index
+      counter_bar.setAutoDraw(true);
+    }
+    
+     if (((cont == true)) && score_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      score_bar.tStart = t;  // (not accounting for frame time here)
+      score_bar.frameNStart = frameN;  // exact frame index
+      score_bar.setAutoDraw(true);
+    }
+    
+     if (((cont == true)) && counter_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      counter_img.tStart = t;  // (not accounting for frame time here)
+      counter_img.frameNStart = frameN;  // exact frame index
+      counter_img.setAutoDraw(true);
+    }
+    
+     if (((cont == true)) && running_score_img.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      running_score_img.tStart = t;  // (not accounting for frame time here)
+      running_score_img.frameNStart = frameN;  // exact frame index
+      running_score_img.setAutoDraw(true);
+    }
+    
+     if (((cont == true)) && thresh.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh.tStart = t;  // (not accounting for frame time here)
+      thresh.frameNStart = frameN;  // exact frame index
+      thresh.setAutoDraw(true);
+    }
+    
+    
+    if (((cont == true)) && thresh_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      thresh_text.tStart = t;  // (not accounting for frame time here)
+      thresh_text.frameNStart = frameN;  // exact frame index
+      thresh_text.setAutoDraw(true);
+    }
+
     
     if (((cont == true)) && conditions.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
@@ -2168,8 +4353,14 @@ function presentationRoutineEachFrame() {
     
     // *stockline1* updates
     if (((cont == true)) && currentHour >= 0 && stockline1.status === PsychoJS.Status.NOT_STARTED) {
+      counter_bar.setAutoDraw(true);
+      score_bar.setAutoDraw(true);
       counter.setAutoDraw(true);
       running_score.setAutoDraw(true);
+      counter_img.setAutoDraw(true);
+      running_score_img.setAutoDraw(true);
+      thresh.setAutoDraw(true);
+      thresh_text.setAutoDraw(true);
       plotLim.setAutoDraw(true);
       zeroLine.setAutoDraw(true);
       conditions.setAutoDraw(true);
@@ -2184,25 +4375,6 @@ function presentationRoutineEachFrame() {
       
     }
 
-    
-    
-    // *stockline1* updates
-    if (((cont == true)) && currentHour >= 0 && stockline1.status === PsychoJS.Status.NOT_STARTED) {
-      counter.setAutoDraw(true);
-      running_score.setAutoDraw(true);
-      plotLim.setAutoDraw(true);
-      zeroLine.setAutoDraw(true);
-      conditions.setAutoDraw(true);
-      eps_level.setAutoDraw(true);
-      eps_dot.setAutoDraw(true);
-      high.setAutoDraw(true);
-      low.setAutoDraw(true);
-      // keep track of start time/frame for later
-      stockline1.tStart = t;  // (not accounting for frame time here)
-      stockline1.frameNStart = frameN;  // exact frame index
-      stockline1.setAutoDraw(true);
-      
-    }
     
     if (((cont == true)) && currentHour >= 1 && stockline2.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
@@ -2288,37 +4460,49 @@ function presentationRoutineEachFrame() {
       stockline13.setAutoDraw(true);
     }
     
-    if ((currentHour == 0) && blockDisplay.status == PsychoJS.Status.NOT_STARTED) {
-      plotLim.setAutoDraw(false);
-      zeroLine.setAutoDraw(false);
-      counter.setAutoDraw(false);
-      running_score.setAutoDraw(false);
-      conditions.setAutoDraw(false);
-      eps_level.setAutoDraw(false);
-      eps_dot.setAutoDraw(false);
-      high.setAutoDraw(false);
-      low.setAutoDraw(false);
-      stockline1.setAutoDraw(false);
-      blockDisplay.tStart = t;  // (not accounting for frame time here)
-      blockDisplay.frameNStart = frameN;  // exact frame index
-      blockDisplay.setAutoDraw(true);
-    }
+    // if ((currentHour == 0) && blockDisplay.status == PsychoJS.Status.NOT_STARTED) {
+    //   plotLim.setAutoDraw(false);
+    //   zeroLine.setAutoDraw(false);
+    //   counter_bar.setAutoDraw(false);
+    //   score_bar.setAutoDraw(false);
+    //   counter.setAutoDraw(false);
+    //   running_score.setAutoDraw(false);
+    //   counter_img.setAutoDraw(false);
+    //   running_score_img.setAutoDraw(false);
+    //   thresh.setAutoDraw(false);
+    //   thresh_text.setAutoDraw(false);
+    //   conditions.setAutoDraw(false);
+    //   eps_level.setAutoDraw(false);
+    //   eps_dot.setAutoDraw(false);
+    //   high.setAutoDraw(false);
+    //   low.setAutoDraw(false);
+    //   stockline1.setAutoDraw(false);
+    //   blockDisplay.tStart = t;  // (not accounting for frame time here)
+    //   blockDisplay.frameNStart = frameN;  // exact frame index
+    //   blockDisplay.setAutoDraw(true);
+    // }
     
-    if (blockDisplay.status === PsychoJS.Status.STARTED && t >= (blockDisplay.tStart + 1.5)) {
-      blockDisplay.setAutoDraw(false);
-      plotLim.setAutoDraw(true);
-      zeroLine.setAutoDraw(true);
-      counter.setAutoDraw(true);
-      running_score.setAutoDraw(true);
-      conditions.setAutoDraw(true);
-      eps_level.setAutoDraw(true);
-      eps_dot.setAutoDraw(true);
-      high.setAutoDraw(true);
-      low.setAutoDraw(true);
-      stockline1.tStart = t;  // (not accounting for frame time here)
-      stockline1.frameNStart = frameN;  // exact frame index
-      stockline1.setAutoDraw(true);
-    }
+    // if (blockDisplay.status === PsychoJS.Status.STARTED && t >= (blockDisplay.tStart + 3)) {
+    //   blockDisplay.setAutoDraw(false);
+    //   plotLim.setAutoDraw(true);
+    //   zeroLine.setAutoDraw(true);
+    //   counter_bar.setAutoDraw(true);
+    //   score_bar.setAutoDraw(true);
+    //   counter.setAutoDraw(true);
+    //   running_score.setAutoDraw(true);
+    //   counter_img.setAutoDraw(true);
+    //   running_score_img.setAutoDraw(true);
+    //   thresh.setAutoDraw(true);
+    //   thresh_text.setAutoDraw(true);
+    //   conditions.setAutoDraw(true);
+    //   eps_level.setAutoDraw(true);
+    //   eps_dot.setAutoDraw(true);
+    //   high.setAutoDraw(true);
+    //   low.setAutoDraw(true);
+    //   stockline1.tStart = t;  // (not accounting for frame time here)
+    //   stockline1.frameNStart = frameN;  // exact frame index
+    //   stockline1.setAutoDraw(true);
+    // }
 
     
     // *resp* updates
@@ -2355,18 +4539,24 @@ function presentationRoutineEachFrame() {
     
     
     // *reward_pres* updates
-    if (((cont == false)) && (counterNum != numSteps) && reward_pres.status === PsychoJS.Status.NOT_STARTED) {
+    if (((cont == false)) && (counterNum != 0) && reward_pres.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
       plotLim.setAutoDraw(false);
       zeroLine.setAutoDraw(false);
+      counter_bar.setAutoDraw(false);
+      score_bar.setAutoDraw(false);
       counter.setAutoDraw(false);
       running_score.setAutoDraw(false);
+      counter_img.setAutoDraw(false);
+      running_score_img.setAutoDraw(false);
+      thresh.setAutoDraw(false);
+      thresh_text.setAutoDraw(false);
       conditions.setAutoDraw(false);
       eps_level.setAutoDraw(false);
       eps_dot.setAutoDraw(false);
       high.setAutoDraw(false);
       low.setAutoDraw(false);
-      blockDisplay.setAutoDraw(false);
+    //   blockDisplay.setAutoDraw(false);
       reward_pres.tStart = t;  // (not accounting for frame time here)
       reward_pres.frameNStart = frameN;  // exact frame index
       
@@ -2377,8 +4567,14 @@ function presentationRoutineEachFrame() {
       reward_pres.setAutoDraw(false);
       plotLim.setAutoDraw(true);
       zeroLine.setAutoDraw(true);
+      counter_bar.setAutoDraw(true);
+      score_bar.setAutoDraw(true);
       counter.setAutoDraw(true);
       running_score.setAutoDraw(true);
+      counter_img.setAutoDraw(true);
+      running_score_img.setAutoDraw(true);
+      thresh.setAutoDraw(true);
+      thresh_text.setAutoDraw(true);
       conditions.setAutoDraw(true);
       eps_level.setAutoDraw(true);
       eps_dot.setAutoDraw(true);
@@ -2394,168 +4590,167 @@ function presentationRoutineEachFrame() {
     if ((thisResp === "right")) {
         cont = true;
         currentHour += 1;
-    } else {
-        if (((thisResp == "up") || (thisResp == "down"))) {
-            if (((thisResp == "up") || (thisResp == "down"))) {
-                cont = false;
-                [correct, score, txt] = reward(feedbackRel, thisResp, actual_state, score);
-                coin = flipCoin();
-                if ((coin <= hazard)) {
-                    state = ((- 1) * state);
-                }
-                reward_shown = true;
-            }
-            currentHour = 0;
-            stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
-            stockline1 = new visual.ShapeStim ({
-              win: psychoJS.window, name: 'stockline1', 
-              vertices: [stocklist[0],stocklist[1]],
-              ori: 0.0, pos: [0, 0],
-              lineWidth: 5.0, 
-              colorSpace: 'rgb',
-              size: [0.5, 0.5],
-              lineColor: new util.Color('white'),
-              fillColor: new util.Color('white'),
-              opacity: undefined, depth: -1, interpolate: true,
-            });
-            stockline2 = new visual.ShapeStim ({
-              win: psychoJS.window, name: 'stockline2', 
-              vertices: [stocklist[1], stocklist[2]],
-              ori: 0.0, pos: [0, 0],
-              lineWidth: 5.0, 
-              colorSpace: 'rgb',
-              size: [0.5, 0.5],
-              lineColor: new util.Color('white'),
-              fillColor: new util.Color('white'),
-              opacity: undefined, depth: -1, interpolate: true,
-            });
+    } else if (((thisResp == "up") || (thisResp == "down")) && counterNum > 1) {
             
-            stockline3 = new visual.ShapeStim ({
-              win: psychoJS.window, name: 'stockline3', 
-              vertices: [stocklist[2], stocklist[3]],
-              ori: 0.0, pos: [0, 0],
-              lineWidth: 5.0, 
-              colorSpace: 'rgb',
-              size: [0.5, 0.5],
-              lineColor: new util.Color('white'),
-              fillColor: new util.Color('white'),
-              opacity: undefined, depth: -1, interpolate: true,
-            });
-            
-            stockline4 = new visual.ShapeStim ({
-              win: psychoJS.window, name: 'stockline4', 
-              vertices: [stocklist[3], stocklist[4]],
-              ori: 0.0, pos: [0, 0],
-              lineWidth: 5.0, 
-              colorSpace: 'rgb',
-              size: [0.5, 0.5],
-              lineColor: new util.Color('white'),
-              fillColor: new util.Color('white'),
-              opacity: undefined, depth: -1, interpolate: true,
-            });
-            
-            stockline5 = new visual.ShapeStim ({
-              win: psychoJS.window, name: 'stockline5', 
-              vertices: [stocklist[4], stocklist[5]],
-              ori: 0.0, pos: [0, 0],
-              lineWidth: 5.0, 
-              colorSpace: 'rgb',
-              size: [0.5, 0.5],
-              lineColor: new util.Color('white'),
-              fillColor: new util.Color('white'),
-              opacity: undefined, depth: -1, interpolate: true,
-            });
-            
-            stockline6 = new visual.ShapeStim ({
-              win: psychoJS.window, name: 'stockline6', 
-              vertices: [stocklist[5], stocklist[6]],
-              ori: 0.0, pos: [0, 0],
-              lineWidth: 5.0, 
-              colorSpace: 'rgb',
-              size: [0.5, 0.5],
-              lineColor: new util.Color('white'),
-              fillColor: new util.Color('white'),
-              opacity: undefined, depth: -1, interpolate: true,
-            });
-            stockline7 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline7', 
-                vertices: [stocklist[6], stocklist[7]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-              stockline8 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline8', 
-                vertices: [stocklist[7], stocklist[8]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-              stockline9 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline9', 
-                vertices: [stocklist[8], stocklist[9]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-              stockline10 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline10', 
-                vertices: [stocklist[9], stocklist[10]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-              stockline11 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline11', 
-                vertices: [stocklist[10], stocklist[11]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-              stockline12 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline12', 
-                vertices: [stocklist[11], stocklist[12]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-              stockline13 = new visual.ShapeStim ({
-                win: psychoJS.window, name: 'stockline13', 
-                vertices: [stocklist[12], stocklist[13]],
-                ori: 0.0, pos: [0, 0],
-                lineWidth: 5.0, 
-                colorSpace: 'rgb',
-                size: [0.5, 0.5],
-                lineColor: new util.Color('white'),
-                fillColor: new util.Color('white'),
-                opacity: undefined, depth: -1, interpolate: true,
-              });
-          }
+        cont = false;
+        [correct, score, txt] = reward(feedbackRel, thisResp, actual_state, score);
+        coin = flipCoin();
+        if ((coin <= hazard)) {
+            state = ((- 1) * state);
+        }
+        reward_shown = true;
+        
+        currentHour = 0;
+        stocklist = getStocksForNHours(state*DRIFT, SIG, 14);
+        stockline1 = new visual.ShapeStim ({
+          win: psychoJS.window, name: 'stockline1', 
+          vertices: [stocklist[0],stocklist[1]],
+          ori: 0.0, pos: [0, 0],
+          lineWidth: 5.0, 
+          colorSpace: 'rgb',
+          size: [0.5, 0.5],
+          lineColor: new util.Color('white'),
+          fillColor: new util.Color('white'),
+          opacity: undefined, depth: -1, interpolate: true,
+        });
+        stockline2 = new visual.ShapeStim ({
+          win: psychoJS.window, name: 'stockline2', 
+          vertices: [stocklist[1], stocklist[2]],
+          ori: 0.0, pos: [0, 0],
+          lineWidth: 5.0, 
+          colorSpace: 'rgb',
+          size: [0.5, 0.5],
+          lineColor: new util.Color('white'),
+          fillColor: new util.Color('white'),
+          opacity: undefined, depth: -1, interpolate: true,
+        });
+        
+        stockline3 = new visual.ShapeStim ({
+          win: psychoJS.window, name: 'stockline3', 
+          vertices: [stocklist[2], stocklist[3]],
+          ori: 0.0, pos: [0, 0],
+          lineWidth: 5.0, 
+          colorSpace: 'rgb',
+          size: [0.5, 0.5],
+          lineColor: new util.Color('white'),
+          fillColor: new util.Color('white'),
+          opacity: undefined, depth: -1, interpolate: true,
+        });
+        
+        stockline4 = new visual.ShapeStim ({
+          win: psychoJS.window, name: 'stockline4', 
+          vertices: [stocklist[3], stocklist[4]],
+          ori: 0.0, pos: [0, 0],
+          lineWidth: 5.0, 
+          colorSpace: 'rgb',
+          size: [0.5, 0.5],
+          lineColor: new util.Color('white'),
+          fillColor: new util.Color('white'),
+          opacity: undefined, depth: -1, interpolate: true,
+        });
+        
+        stockline5 = new visual.ShapeStim ({
+          win: psychoJS.window, name: 'stockline5', 
+          vertices: [stocklist[4], stocklist[5]],
+          ori: 0.0, pos: [0, 0],
+          lineWidth: 5.0, 
+          colorSpace: 'rgb',
+          size: [0.5, 0.5],
+          lineColor: new util.Color('white'),
+          fillColor: new util.Color('white'),
+          opacity: undefined, depth: -1, interpolate: true,
+        });
+        
+        stockline6 = new visual.ShapeStim ({
+          win: psychoJS.window, name: 'stockline6', 
+          vertices: [stocklist[5], stocklist[6]],
+          ori: 0.0, pos: [0, 0],
+          lineWidth: 5.0, 
+          colorSpace: 'rgb',
+          size: [0.5, 0.5],
+          lineColor: new util.Color('white'),
+          fillColor: new util.Color('white'),
+          opacity: undefined, depth: -1, interpolate: true,
+        });
+        stockline7 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline7', 
+            vertices: [stocklist[6], stocklist[7]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
+          stockline8 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline8', 
+            vertices: [stocklist[7], stocklist[8]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
+          stockline9 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline9', 
+            vertices: [stocklist[8], stocklist[9]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
+          stockline10 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline10', 
+            vertices: [stocklist[9], stocklist[10]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
+          stockline11 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline11', 
+            vertices: [stocklist[10], stocklist[11]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
+          stockline12 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline12', 
+            vertices: [stocklist[11], stocklist[12]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
+          stockline13 = new visual.ShapeStim ({
+            win: psychoJS.window, name: 'stockline13', 
+            vertices: [stocklist[12], stocklist[13]],
+            ori: 0.0, pos: [0, 0],
+            lineWidth: 5.0, 
+            colorSpace: 'rgb',
+            size: [0.5, 0.5],
+            lineColor: new util.Color('white'),
+            fillColor: new util.Color('white'),
+            opacity: undefined, depth: -1, interpolate: true,
+          });
       }
+      
 
     // check for quit (typically the Esc key)
     if (psychoJS.experiment.experimentEnded || psychoJS.eventManager.getKeys({keyList:['escape']}).length > 0) {
@@ -2671,8 +4866,13 @@ function summaryRoutineEachFrame() {
       // keep track of start time/frame for later
       plotLim.setAutoDraw(false);
       zeroLine.setAutoDraw(false);
+      score_bar.setAutoDraw(false);
       counter.setAutoDraw(false);
       running_score.setAutoDraw(false);
+      counter_img.setAutoDraw(false);
+      running_score_img.setAutoDraw(false);
+      thresh.setAutoDraw(false);
+      thresh_text.setAutoDraw(false);
       conditions.setAutoDraw(false);
       eps_level.setAutoDraw(false);
       eps_dot.setAutoDraw(false);
