@@ -9,6 +9,7 @@ import os
 import sklearn
 from sklearn.linear_model import LinearRegression
 import statsmodels.formula.api as smf
+from scipy import stats
 
 numBlocks = 8
 numSteps = 370
@@ -48,10 +49,11 @@ def load(filepath, thresh):
     df.drop(columns = 'index', inplace=True)
     df["commit"] = [1 if resp == 'up' or resp == 'down' else 0 for resp in df['resp.keys']]
     df["resp.keys"] = [1 if resp == 'up' else -1 if resp == 'down' else 0 for resp in df['resp.keys']]
-    df["dPrice_dt"] = np.diff(df['price'], append=0)
+    df["dPrice_dt"] = np.diff(df['price'], prepend=0)
     overall_acc = accuracy(df)
     # print result
-    print(participant_ID, ':', compute_bonus(df, thresh), '\nAccuracy:', overall_acc)
+    if compute_bonus(df, thresh) != 0:
+        print(str(participant_ID) + ',' + str(compute_bonus(df, thresh)))
     return participant_ID, df, overall_acc
 
 def convert_to_bursty(choice, idx):
@@ -85,12 +87,8 @@ def convert_to_bursty(choice, idx):
     lags = dfTL.groupby(dfTL['TL']).count()
     return np.array(time_lags), np.array(lags.index), np.array(lags.counts), dfTL.shape[0]
 
-def block(n, df):
-    k = int(df.shape[0]/9)
-    return df.iloc[(n-1)*k: n*k]
-
-def block_discard(n, df, start):
-    k = int(df.shape[0]/9)
+def block(n, df, start):
+    k = int(df.shape[0]/numBlocks)
     block = df.iloc[(n-1)*k: n*k]
     return block.iloc[start:]
 
@@ -105,14 +103,12 @@ def compute_bonus(df, thresh):
     avg_score_per_block = [sc - round(sc/2, 0) for sc in thresh]
     bonus_threshold = np.sum(avg_score_per_block)
     final_score = df['score'].iloc[-1]
-    if final_score >= dp_threshold:
-        return "Exceeded DP algorithm score"
-    elif final_score >= 2/3*dp_threshold:
-        return "Exceeded 2/3rds of DP algorithm score"
-    elif final_score >= bonus_threshold:
-        return "Exceeded bonus threshold"
+    # if final_score >= dp_threshold:
+    #     return "Exceeded DP algorithm score"
+    if final_score >= bonus_threshold:
+        return round(final_score/bonus_threshold,2)
     else:
-        return "No bonus"
+        return 0
 
 def compute_burstiness(lags_line):
     mean = np.mean(lags_line)
@@ -125,18 +121,21 @@ def compute_mean(lags_line):
 def compute_std(lags_line):
     return np.std(lags_line)
 
-def get_accuracy(data):
+def get_accuracy(data, d=0):
     q = []; eps = []; acc_i = []; nlist = []
     for i in range(1,numBlocks+1):
-        curBlock = block(i,data)
+        curBlock = block(i,data,d)
         q.append(curBlock['q_prob'].iloc[1]); eps.append(curBlock['eps_prob'].iloc[1])
-        acc_i.append(accuracy(curBlock)); nlist.append(N)
-    return q, eps, acc_i, nlist
+        acc_i.append(accuracy(curBlock))
+    q = np.array(q); q = q.reshape(-1,1)
+    eps = np.array(eps); eps = eps.reshape(-1,1)
+    acc_i = np.array(acc_i); acc_i = acc_i.reshape(-1,1)
+    return q, eps, acc_i
 
-def get_burstiness(data):
+def get_burstiness(data, d=0):
     q = []; eps = []; b_i = []; nlist = []
     for i in range(1,numBlocks+1):
-        curBlock = block(i,data)
+        curBlock = block(i,data,d)
         all_lags, lags, freq, N = convert_to_bursty(np.array(curBlock.commit), 1)
         q.append(curBlock['q_prob'].iloc[1]); eps.append(curBlock['eps_prob'].iloc[1])
         b_i.append(compute_burstiness(all_lags)); nlist.append(N)
@@ -146,10 +145,10 @@ def get_burstiness(data):
     nlist = np.array(nlist); nlist = nlist.reshape(-1,1)
     return q, eps, b_i, nlist
     
-def get_mean_iai(data):
+def get_mean_iai(data, d=0):
     q = []; eps = []; mu_i = []; nlist = []
     for i in range(1,numBlocks+1):
-        curBlock = block(i,data)
+        curBlock = block(i,data,d)
         all_lags, lags, freq, N = convert_to_bursty(np.array(curBlock.commit), 1)
         q.append(curBlock['q_prob'].iloc[1]); eps.append(curBlock['eps_prob'].iloc[1])
         mu_i.append(compute_mean(all_lags)); nlist.append(N)
@@ -160,20 +159,23 @@ def get_mean_iai(data):
     return q, eps, mu_i, nlist
 
 def get_linear_fit(x,y):
-    mdl = LinearRegression().fit(x,y)
-    r2 = mdl.score(x,y)
+    slope, intercept, r2, p, se = stats.linregress(x[:,0], y[:,0])
     linestyle = 'solid'
-    if r2 < 0.4:
+    color = 'grey'
+    if r2 < 0.5:
         linestyle = 'dotted'
-    return x, mdl.predict(x), linestyle
+    if p < 0.05:
+        color = 'cyan'
+    inp = np.linspace(np.min(x), np.max(x), 8)
+    outp = slope*inp + intercept
+    inp = inp.reshape(-1,1); outp = outp.reshape(-1,1)
+    return inp, outp, linestyle, color
 
     
-def get_threshold(data):
+def get_threshold(data, d=0):
     q = []; eps = []; up_price = []; down_price = []; change_up = []; change_down = []
-    fig, ax = plt.subplots(figsize=(6,3.5),dpi=150)
-    plt.subplots_adjust(wspace=0.5)
     for i in range(1,numBlocks+1):
-        curBlock = block(i,data)
+        curBlock = block(i,data,d)
         ups = curBlock.index[curBlock['resp.keys'] == 1]
         ups = ups - 1
         ups = ups[1:]
@@ -192,42 +194,16 @@ def get_threshold(data):
     change_up = np.array(change_up); change_up = change_up.reshape(-1,1)
     change_down = np.array(change_down); change_down = change_down.reshape(-1,1)
     
-    plt.subplot(221)
-    plt.scatter(eps, up_price)
-    plt.xlabel('$\epsilon$')
-    plt.ylabel('$P$ when $s = s_+$')
-    
-    plt.subplot(222)
-    plt.scatter(eps,down_price)
-    plt.xlabel('$\epsilon$')
-    plt.ylabel('$P$ when $s = s_-$')
-    
-    plt.subplot(223)
-    plt.scatter(eps, change_up)
-    plt.xlabel('$\epsilon$')
-    plt.ylabel('$\\frac{dP}{dt}$ when $s=s_+$')
-    
-    plt.subplot(224)
-    plt.scatter(eps, change_down)
-    plt.xlabel('$\epsilon$')
-    plt.ylabel('$\\frac{dP}{dt}$ when $s=s_-$')
-    plt.show()
-    
-    
-#     plt.subplot(221)
-#     plt.scatter(q,up_price)
-    
-#     plt.subplot(222)
-#     plt.scatter(q, down_price)
+    return q, eps, up_price, down_price, change_up, change_down
     
 
     
-def plot_eps(data):
+def plot_eps(data, d=0):
     eps = []; b_i = []; mu_i = []; std_i = [];
     fig, ax = plt.subplots(figsize=(7,2.5),dpi=150)
     plt.subplots_adjust(wspace=0.4)
     for i in range(1,numBlocks+1):
-        curBlock = block(i,data)
+        curBlock = block(i,data,d)
         all_lags, lags, freq, N = convert_to_bursty(np.array(curBlock.commit), 1)
         eps.append(curBlock['eps_prob'].iloc[1])
         b_i.append(compute_burstiness(all_lags))
