@@ -212,6 +212,24 @@ def get_threshold(data, d=0):
     change_down = np.array(change_down); change_down = change_down.reshape(-1,1)
     
     return q, eps, up_price, down_price, change_up, change_down
+
+
+
+def get_abs_threshold(data, d=0):
+    q = []; eps = []; threshold_price = []
+    for i in range(1,numBlocks+1):
+        curBlock = block(i,data,d)
+        all = curBlock.index[np.abs(curBlock['resp.keys']) == 1]
+        all = all - 1
+        all = all[1:]
+        q.append(curBlock['q_prob'].iloc[1]); eps.append(curBlock['eps_prob'].iloc[1])
+        threshold_price.append(np.mean(data.iloc[all]['price'])); 
+      
+    q = np.array(q); q = q.reshape(-1,1)
+    eps = np.array(eps); eps = eps.reshape(-1,1)
+    threshold_price = np.array(threshold_price); threshold_price = threshold_price.reshape(-1,1)
+    
+    return q, eps, threshold_price
     
 
     
