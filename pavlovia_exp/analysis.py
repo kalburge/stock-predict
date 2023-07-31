@@ -23,7 +23,7 @@ def get_files_in_directory(directory):
             files.append(f)
     return files
 
-def load(filepath, thresh):
+def load(filepath, thresh, show=False):
     df = pd.read_csv(filepath)
     participant_ID = 0
     if 'PROLIFIC_PID' in df.columns:
@@ -52,8 +52,9 @@ def load(filepath, thresh):
     df["dPrice_dt"] = np.diff(df['price'], prepend=0)
     overall_acc = accuracy(df)
     # print result
-    if compute_bonus(df, thresh) != 0:
-        print(str(participant_ID) + ',' + str(compute_bonus(df, thresh)))
+    if show:
+        if compute_bonus(df, thresh) != 0:
+            print(str(participant_ID) + ',' + str(compute_bonus(df, thresh)))
     return participant_ID, df, overall_acc
 
 def convert_to_bursty(choice, idx):
@@ -160,6 +161,22 @@ def get_mean_iai(data, d=0):
 
 def get_linear_fit(x,y):
     slope, intercept, r2, p, se = stats.linregress(x[:,0], y[:,0])
+    linestyle = 'solid'
+    color = 'grey'
+    if r2 < 0.5:
+        linestyle = 'dotted'
+    if p < 0.05:
+        color = 'cyan'
+    inp = np.linspace(np.min(x), np.max(x), 8)
+    outp = slope*inp + intercept
+    inp = inp.reshape(-1,1); outp = outp.reshape(-1,1)
+    return inp, outp, linestyle, color
+
+def get_sin_fit(x,y):
+    dataset = np.concatenate((x[:,0].reshape(-1,1), y[:,0].reshape(-1,1)), axis=1)
+    dataset = pd.DataFrame(data, columns = ["x", "y"])
+    mdl = smf.logit(formula = "y~x", data = dataset).fit()
+    slope, intercept, r2, p, se = mdl.params[1], mdl.params[0], mdl.prsquared, mdl.pval
     linestyle = 'solid'
     color = 'grey'
     if r2 < 0.5:
