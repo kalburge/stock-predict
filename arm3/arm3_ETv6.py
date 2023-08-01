@@ -28,11 +28,15 @@ paramset = [[0.05, 0.55], [0.25, 0.55], [0.45, 0.55], [0.05, 0.75], [0.25, 0.75]
 params = random.sample(paramset, len(paramset))
 memory_mode = True
 
-dummy_mode = True
+dummy_mode = False
 joy_mode = True
 full_screen = True
 use_retina = False
 edf_fname = 'ARM3_ET'
+
+press_to_continue = "SPACE"
+if joy_mode:
+    press_to_continue = "B"
 
 
 grey = (0.5, 0.5, 0.5)
@@ -285,7 +289,7 @@ def clear(win):
     win.flip()
 
 
-def show_msg(win, txt, time=T_STIM, h=None, p=(0,0), wait_kb=True):
+def show_msg(win, txt, time=T_STIM, h=None, p=(0,0), wait_kb=True, wrapWidth=None):
     """Show text message stimuli to participants"""
     txt_color = (-0.4,-0.4,-0.4)
     tmp = 0
@@ -329,8 +333,32 @@ def show_msg(win, txt, time=T_STIM, h=None, p=(0,0), wait_kb=True):
                         tmp += 1
                     keypress = True
 
+
+def show_calibration(win, txt, time=T_STIM, h=None, p=(0,0), wait_kb=True):
+    """Show text message stimuli to participants"""
+    txt_color = (-0.4,-0.4,-0.4)
+    tmp = 0
+    if not wait_kb:
         
+        msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
         
+        msg.draw()
+        win.flip()
+        wait(time)
+        
+    else:
+        msg = visual.TextStim(win, text=txt, height=h, pos=p, color=txt_color)
+        msg.draw()
+        win.flip()
+        key = waitKeys()
+        if key[0] == "q":
+            print("Quitting program...")
+            quit()
+        
+def instructions(win):
+    img_path = 'images/training_img.png'
+    training_img = visual.ImageStim(win, image=img_path, size=None)
+    return
 
 def terminate_task():
     """ Terminate the task gracefully and retrieve the EDF data file
@@ -565,7 +593,7 @@ def run_trial(hazard, feed, txt):
                         get_keypress = True
                         count -= 1
                             
-                    elif bttnPress.getButton(RB):
+                    elif bttnPress.getButton(Y):
                         keypress_time = core.getTime()*1000
                         while bttnPress.getButton(B):
                             hold_time += 1
@@ -576,7 +604,7 @@ def run_trial(hazard, feed, txt):
                         get_keypress = True
                         count -= 1
                         
-                    elif bttnPress.getButton(LB):
+                    elif bttnPress.getButton(A):
                         keypress_time = core.getTime()*1000
                         while bttnPress.getButton(B):
                             hold_time += 1
@@ -600,7 +628,7 @@ def run_trial(hazard, feed, txt):
                         return error
                         # Stop stimulus presentation when the spacebar is pressed
                             
-                    elif bttnPress.getButton(RB):
+                    elif bttnPress.getButton(Y):
                         keypress_time = core.getTime()*1000
                         while bttnPress.getButton(B):
                             hold_time += 1
@@ -611,7 +639,7 @@ def run_trial(hazard, feed, txt):
                         get_keypress = True
                         count -= 1
                         
-                    elif bttnPress.getButton(LB):
+                    elif bttnPress.getButton(A):
                         keypress_time = core.getTime()*1000
                         while bttnPress.getButton(B):
                             hold_time += 1
@@ -770,17 +798,12 @@ def display_reward(win, run, score, state, feed):
 # Step 5: Set up the camera and calibrate the tracker
 
 # Show the task instructions
-consent_msg = "This is an academic research project conducted through the University of Pennsylvania. In this game, you are being trained as a day-trader at a financial assets company. You will view a stock market fluctuate on an hourly basis over the course of a day and decide whether you think the stock value will be higher at the end of the day than at the beginning.\n\nThe estimated total time is about 30 minutes.\n\nYou must be at least 18 years old to participate. Your participation in this research is voluntary, which means you can choose whether or not to participate without negative consequences. Your anonymity is assured: the researchers who have requested your participation will not receive any personal information about you except your previously provided Prolific demographic data such as gender, ethnicity, and age. The de-identified data may be stored and distributed for future research studies without additional informed consent.\n\nIf you have questions about this research, please contact Ishan Kalburge by emailing ikalbur1@jhu.edu or Josh Gold by emailing jigold@pennmedicine.upenn.edu.\n\nIf you have questions, concerns, or complaints regarding your participation in this research study, or if you have any questions about your rights as a research subject and you cannot reach a member of the study team, you may contact the Office of Regulatory Affairs at the University of Pennsylvania by calling (215) 898-2614 or emailing irb@pobox.upenn.edu.\n\nBy pressing SPACE, you acknowledge that you have read the information above and agree to take part in this study, and that you understand that you may withdraw your consent at any time before you complete the tasks."
-intro_msg = "You are being trained as a day trader to make moment-by-moment stock-market predictions as quickly and accurately as possible.\n\nSpecifically, you will view graphs of stock-market prices fluctuating up and down over time (from the left to the right of the screen). Your task is to determine on each screen whether the stock price will be higher or lower at the end (the right of the screen) than it was at the beginning (the left of the screen).\n\nPress SPACE to continue."
-directions_msg = "For each time step, you can choose one of three actions:\n\n1)    Press RIGHT to sample another time step of stock-market data.\n2)    Press UP if you think that the stock price at the end will be HIGHER than at the beginning.\n3)    Press DOWN if you think that the stock price at the end will be LOWER than at the beginning.\n\nPress SPACE to continue."
-details_msg = "Each screen will show up to 13 time steps. You must commit to an UP or DOWN choice on the final time step, if you have not done so already. Once you commit to a choice for a given screen, you will typically (but not always) be given immediate feedback about whether your choice was correct or not.\n\nImportantly, your training for a given set of conditions (i.e. a particular stock) will end after you have used up a fixed number of time samples equal to " + str(numSteps) + ". Note that for different stocks (blocks of " + str(numSteps) + " time samples), stocks may have different levels of volatility and could, accordingly, change direction at random. The number of remaining time samples will be shown at the bottom-left corner. Note that using more samples on a given screen gives you more data and thus generally supports more accurate choices but also gives you fewer opportunities to make choices and potentially receive feedback.\n\nPress SPACE to continue."
-vars_msg = "Each block of " + str(numSteps) + " time samples will be associated with different levels of RELIABILITY and VOLATILITY (high, medium, or low).\n\nHigh RELIABILITY blocks will be ones in which you are very likely to get immediate feedback after you make a choice. This will come in the form of 'Correct!' for correct choices, 'Incorrect!' for incorrect choices, and 'No Feedback!' for unlucky choices. Conversely, low reliability blocks may give you infrequent feedback on your accuracy.\n\nHigh VOLATILITY blocks are ones in which the stock frequently changes direction, whereas in blocks with low volatility, stocks are unlikely to change direction.\n\nPress SPACE to BEGIN the task."
 
-show_msg(win, consent_msg)
-show_msg(win, intro_msg)
-show_msg(win, directions_msg)
-show_msg(win, details_msg)
-show_msg(win, vars_msg)
+    
+consent_msg = "This is an academic research project conducted through the University of Pennsylvania. In this game, you are being trained as a day-trader at a financial assets company. You will view a stock market fluctuate on an hourly basis over the course of a day and decide whether you think the stock value will be higher at the end of the day than at the beginning.\n\nThe estimated total time is about 30 minutes.\n\nYou must be at least 18 years old to participate. Your participation in this research is voluntary, which means you can choose whether or not to participate without negative consequences. Your anonymity is assured: the researchers who have requested your participation will not receive any personal information about you except your previously provided Prolific demographic data such as gender, ethnicity, and age. The de-identified data may be stored and distributed for future research studies without additional informed consent.\n\nIf you have questions about this research, please contact Ishan Kalburge by emailing ikalbur1@jhu.edu or Josh Gold by emailing jigold@pennmedicine.upenn.edu.\n\nIf you have questions, concerns, or complaints regarding your participation in this research study, or if you have any questions about your rights as a research subject and you cannot reach a member of the study team, you may contact the Office of Regulatory Affairs at the University of Pennsylvania by calling (215) 898-2614 or emailing irb@pobox.upenn.edu.\n\nBy pressing " + press_to_continue + ", you acknowledge that you have read the information above and agree to take part in this study, and that you understand that you may withdraw your consent at any time before you complete the tasks."
+disclaimer_msg = "Please read the following instructions carefully. You will not be able to return to a previous screen.\n\nPress 'SPACE' " + press_to_continue + " to continue."
+
+show_calibration(win, "Press ENTER twice to calibrate the EyeLink!")
 
 # skip this step if running the script in Dummy Mode
 if not dummy_mode:
@@ -789,6 +812,13 @@ if not dummy_mode:
     except RuntimeError as err:
         print('ERROR:', err)
         el_tracker.exitCalibration()
+        
+        
+
+        
+show_msg(win, consent_msg, wrapWidth = 5)
+show_msg(win, disclaimer_msg)
+
 
 # Step 6: Run the experimental trials, index all the trials
 genv.setTargetType('picture')
