@@ -11,6 +11,249 @@ const { Scheduler } = util;
 const { abs, sin, cos, PI: pi, sqrt } = Math;
 const { round } = util;
 
+const DRIFT = 0.5;
+const SIG = 1;
+var cont = true;
+var stocklist = [];
+
+const completionCode = 'C1NJP8LA';
+
+const numSteps = 370;
+const trainSteps12 = 50;
+const trainSteps3on = 50;
+var counterNum = numSteps;
+// const dp_threshold = 993;
+var dp_threshold = 10;
+var avg_score = dp_threshold - Math.round(dp_threshold/2);
+// const param_set = [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5];
+// [241. 199. 159. 123.  89.  66.  58.  58.]
+const param_set = [[0.05, 241], [0.1143, 199], [0.1786, 159], [0.2429, 123], [0.3071, 89], [0.3714, 66], [0.4357, 58], [0.5, 58]];
+var numBlocks = param_set.length;
+var params = shuffle(param_set);
+var feedbackRel = 0.75;
+var hazard = 0;
+// const color_increment = [-1, -0.71428571, -0.42857143, -0.14285714,  0.14285714, 0.42857143,  0.71428571, 1];
+
+var coin = flipCoin();
+var state = 1;
+if ((coin > 0.5)) {
+    state = (- 1);
+}
+var score = 0;
+var correct = (- 1);
+var REWARD = 1;
+var PUNISH = (- 1);
+var reward_shown = false;
+var currentHour = 0;
+
+var draw;
+var success;
+var cor;
+var txt;
+var color = "";
+
+
+
+
+var presentationComponents;
+var presentationClock;
+
+
+var space_to_begin;
+var space_to_continue;
+
+
+var startTraining_text;
+var startTrainingComponents;
+var startTrainingClock;
+
+
+
+var introductionComponents;
+var introductionClock;
+var intro_text;
+
+
+var consentComponents;
+var consentClock;
+var consent_text;
+
+
+var objectiveComponents;
+var objectiveClock;
+var objective_top_text;
+
+var objective_initial_text;
+var objective_final_text;
+var objective_zeroLine_label_line;
+var objective_time_axis;
+var objective_data_box;
+var objective_data_text;
+
+var objective2Components;
+var objective2_top_text;
+
+
+
+var explainButtonsComponents;
+var explainButtonsClock;
+var explainButtons_top_text;
+
+
+var explainWindowComponents;
+var explainWindowClock;
+var explainWindow_top_text;
+
+
+var firstPracticeComponents;
+var firstPracticeClock;
+var firstPracticeRel = 1;
+
+
+var explainFeedback1Components;
+var explainFeedback1Clock;
+var explainFeedback1_top_text;
+var explainFeedback1_center_text;
+
+
+var explainFeedback2Components;
+var explainFeedback2Clock;
+var explainFeedback2_top_text;
+var correct_text;
+var error_text;
+var noFeedback_text;
+
+
+var secondPracticeComponents;
+var secondPracticeClock;
+
+var explainSteps1Components;
+var explainSteps1Clock;
+var explainSteps1_top_text;
+var explainSteps_step_box;
+
+
+var explainSteps2Components;
+var explainSteps2Clock;
+var explainSteps2_top_text;
+
+
+var thirdPracticeComponents;
+var thirdPracticeClock;
+
+var explainScoreComponents;
+var explainScoreClock;
+var explainScore_top_text;
+var explainScore_score_box;
+
+
+var explainBenchmarkComponents;
+var explainBenchmarkClock;
+var explainBenchmark_top_text;
+var explainBenchmark_benchmark_box
+
+var fourthPracticeComponents;
+var fourthPracticeClock;
+
+
+var explainStabilityComponents;
+var explainStabilityClock;
+var explainStability_top_text;
+var explainStability_center_box;
+
+
+var explainLowStabilityComponents;
+var explainLowStabilityClock;
+var explainLowStability_top_text;
+var explainLowStability_center_box;
+
+
+var fifthPracticeComponents;
+var fifthPracticeClock;
+
+
+var explainHighStabilityComponents;
+var explainHighStabilityClock;
+var explainHighStability_top_text;
+var explainHighStability_center_box;
+
+var sixthPracticeComponents;
+var sixthPracticeClock;
+
+
+
+var beginComponents;
+var beginClock;
+
+
+
+var displayComponents;
+var displayClock;
+var display_eps_level;
+var display_eps_dot;
+var display_high;
+var display_low;
+
+
+var completionComponents;
+var completionClock;
+var completion_text;
+
+
+
+var space_bar;
+var stockline1;
+var stockline2;
+var stockline3;
+var stockline4;
+var stockline5;
+var stockline6;
+var stockline7;
+var stockline8;
+var stockline9;
+var stockline10;
+var stockline11;
+var stockline12;
+var stockline13;
+var plotLim;
+var zeroLine;
+var dummystock;
+var eps_level;
+var eps_dot;
+var low;
+var high;
+var counter;
+var running_score;
+var counter_img;
+var running_score_text;
+var running_score_img;
+var thresh;
+var thresh_text;
+var counter_bar;
+var score_bar;
+const bar_width = 0.05;
+const bar_height = 0.2;
+const score_bar_pos = 0.4;
+const counter_bar_pos = -1*score_bar_pos;
+const counter_increment = bar_height/numSteps;
+var score_increment = bar_height/(2*avg_score);
+var counter_bar_height = counterNum*counter_increment;
+var score_bar_height = score*score_increment;
+const thresh_height = bar_height*0;
+var thresh_str = 'Benchmark: ' + avg_score.toString();
+var score_height;
+var conditions;
+const condText = 'Current Stability';
+var resp;
+var reward_pres;
+var blockDisplay;
+var blockN = 0;
+var displayText;
+var summaryClock;
+var final_screen;
+var globalClock;
+var routineTimer;
+
 
 // store info about the experiment session:
 let expName = 'arm3_eps';  // from the Builder filename that created this script
@@ -19,12 +262,7 @@ let expInfo = {
     'session': '001',
 };
 
-// Start code blocks for 'Before Experiment'
-// Run 'Before Experiment' code from getNormalRV
-const DRIFT = 0.5;
-const SIG = 1;
-var cont = true;
-var stocklist = [];
+
 
 
 function flipCoin() {
@@ -78,24 +316,7 @@ function getStocksForNHours(mean, stddev, N) {
     return stock
 }
 
-var coin = flipCoin();
-var state = 1;
-if ((coin > 0.5)) {
-    state = (- 1);
-}
-// Run 'Before Experiment' code from whatNext
-var score = 0;
-var correct = (- 1);
-var REWARD = 1;
-var PUNISH = (- 1);
-var reward_shown = false;
-var currentHour = 0;
 
-var draw;
-var success;
-var cor;
-var txt;
-var color = "";
 
 
 function reward(Q, run, correct_state, score) {
@@ -255,6 +476,9 @@ flowScheduler.add(blocksLoopEnd);
 //flowScheduler.add(stepsLoopBegin(stepsLoopScheduler));
 //flowScheduler.add(stepsLoopScheduler);
 //flowScheduler.add(stepsLoopEnd);
+flowScheduler.add(completionRoutineBegin());
+flowScheduler.add(completionRoutineEachFrame());
+flowScheduler.add(completionRoutineEnd());
 flowScheduler.add(summaryRoutineBegin());
 flowScheduler.add(summaryRoutineEachFrame());
 flowScheduler.add(summaryRoutineEnd());
@@ -302,215 +526,7 @@ async function updateInfo() {
   return Scheduler.Event.NEXT;
 }
 
-const numSteps = 5;
-const trainSteps12 = 60;
-const trainSteps3on = 60;
-var counterNum = numSteps;
-// const dp_threshold = 311;
-var dp_threshold = 10;
-var avg_score = dp_threshold - Math.round(dp_threshold/2);
-// const param_set = [0.05, 0.1143, 0.1786, 0.2429, 0.3071, 0.3714, 0.4357, 0.5];
-const param_set = [[0.05, 80], [0.1143, 56], [0.1786, 41], [0.2429, 32], [0.3071, 29], [0.3714, 25], [0.4357, 24], [0.5, 24]];
-var numBlocks = param_set.length;
-var params = shuffle(param_set);
-var feedbackRel = 0.75;
-var hazard = 0;
-const color_increment = [-1, -0.71428571, -0.42857143, -0.14285714,  0.14285714, 0.42857143,  0.71428571, 1];
 
-
-var presentationComponents;
-var presentationClock;
-
-
-var space_to_begin;
-var space_to_continue;
-
-
-var startTraining_text;
-var startTrainingComponents;
-var startTrainingClock;
-
-
-
-var introductionComponents;
-var introductionClock;
-var intro_text;
-
-
-var consentComponents;
-var consentClock;
-var consent_text;
-
-
-var objectiveComponents;
-var objectiveClock;
-var objective_top_text;
-
-var objective_initial_text;
-var objective_final_text;
-var objective_zeroLine_label_line;
-var objective_time_axis;
-var objective_data_box;
-var objective_data_text;
-
-var objective2Components;
-var objective2_top_text;
-
-
-
-var explainButtonsComponents;
-var explainButtonsClock;
-var explainButtons_top_text;
-
-
-var explainWindowComponents;
-var explainWindowClock;
-var explainWindow_top_text;
-
-
-var firstPracticeComponents;
-var firstPracticeClock;
-var firstPracticeRel = 1;
-
-
-var explainFeedback1Components;
-var explainFeedback1Clock;
-var explainFeedback1_top_text;
-var explainFeedback1_center_text;
-
-
-var explainFeedback2Components;
-var explainFeedback2Clock;
-var explainFeedback2_top_text;
-var correct_text;
-var error_text;
-var noFeedback_text;
-
-
-var secondPracticeComponents;
-var secondPracticeClock;
-
-var explainSteps1Components;
-var explainSteps1Clock;
-var explainSteps1_top_text;
-var explainSteps_step_box;
-
-
-var explainSteps2Components;
-var explainSteps2Clock;
-var explainSteps2_top_text;
-
-
-var thirdPracticeComponents;
-var thirdPracticeClock;
-
-var explainScoreComponents;
-var explainScoreClock;
-var explainScore_top_text;
-var explainScore_score_box;
-
-
-var explainBenchmarkComponents;
-var explainBenchmarkClock;
-var explainBenchmark_top_text;
-var explainBenchmark_benchmark_box
-
-var fourthPracticeComponents;
-var fourthPracticeClock;
-
-
-var explainStabilityComponents;
-var explainStabilityClock;
-var explainStability_top_text;
-var explainStability_center_box;
-
-
-var explainLowStabilityComponents;
-var explainLowStabilityClock;
-var explainLowStability_top_text;
-var explainLowStability_center_box;
-
-
-var fifthPracticeComponents;
-var fifthPracticeClock;
-
-
-var explainHighStabilityComponents;
-var explainHighStabilityClock;
-var explainHighStability_top_text;
-var explainHighStability_center_box;
-
-var sixthPracticeComponents;
-var sixthPracticeClock;
-
-
-
-var beginComponents;
-var beginClock;
-
-
-
-var displayComponents;
-var displayClock;
-var display_eps_level;
-var display_eps_dot;
-var display_high;
-var display_low;
-
-
-
-var space_bar;
-var stockline1;
-var stockline2;
-var stockline3;
-var stockline4;
-var stockline5;
-var stockline6;
-var stockline7;
-var stockline8;
-var stockline9;
-var stockline10;
-var stockline11;
-var stockline12;
-var stockline13;
-var plotLim;
-var zeroLine;
-var dummystock;
-var eps_level;
-var eps_dot;
-var low;
-var high;
-var counter;
-var running_score;
-var counter_img;
-var running_score_text;
-var running_score_img;
-var thresh;
-var thresh_text;
-var counter_bar;
-var score_bar;
-const bar_width = 0.05;
-const bar_height = 0.2;
-const score_bar_pos = 0.4;
-const counter_bar_pos = -1*score_bar_pos;
-const counter_increment = bar_height/numSteps;
-var score_increment = bar_height/(2*avg_score);
-var counter_bar_height = counterNum*counter_increment;
-var score_bar_height = score*score_increment;
-const thresh_height = bar_height*0;
-var thresh_str = 'Benchmark: ' + avg_score.toString();
-var score_height;
-var conditions;
-const condText = 'Current Stability';
-var resp;
-var reward_pres;
-var blockDisplay;
-var blockN = 0;
-var displayText;
-var summaryClock;
-var score_display;
-var globalClock;
-var routineTimer;
 async function experimentInit() {
   // Initialize components for Routine "instructions"
   startTrainingClock = new util.Clock();
@@ -535,6 +551,7 @@ async function experimentInit() {
   explainLowStabilityClock = new util.Clock();
   sixthPracticeClock = new util.Clock();
   beginClock = new util.Clock();
+  completionClock = new util.Clock();
   displayClock = new util.Clock();
   
   
@@ -595,6 +612,19 @@ async function experimentInit() {
     win: psychoJS.window,
     name: 'intro_text',
     text: "Please read the following instructions carefully. You will not be able to return to a previous screen.\n\nPress SPACE to continue.",
+    font: 'Open Sans',
+    units: undefined, 
+    pos: [0, 0], height: 0.045,  wrapWidth: undefined, ori: 0.0,
+    languageStyle: 'LTR',
+    color: new util.Color('white'),  opacity: undefined,
+    depth: 0.0 
+  });
+
+
+  completion_text = new visual.TextStim({
+    win: psychoJS.window,
+    name: 'intro_text',
+    text: "",
     font: 'Open Sans',
     units: undefined, 
     pos: [0, 0], height: 0.045,  wrapWidth: undefined, ori: 0.0,
@@ -931,7 +961,7 @@ async function experimentInit() {
   explainHighStability_top_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'vars_text',
-    text: "If you are in a HIGH stability block, the final price will tend to be higher or lower than the initial price for numerous trials in a row, and so you should expect to select either UP or DOWN numerous times in a row.",
+    text: "If you are in a HIGH stability block, the final price will tend to be higher or lower than the initial price for numerous trials in a row, and so you should expect to select either UP or DOWN numerous times in a row. Noting this can allow you to perform better and increase your salary bonus.",
     font: 'Open Sans',
     pos: [0, 0.4], height: 0.03,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
@@ -954,7 +984,7 @@ async function experimentInit() {
   explainLowStability_top_text = new visual.TextStim({
     win: psychoJS.window,
     name: 'vars_text',
-    text: "If you are in a LOW stability block, the final price will tend to be higher or lower than the initial price more randomly from trial to trial, and so you should NOT expect to select either UP or DOWN numerous times in a row.",
+    text: "If you are in a LOW stability block, the final price will tend to be higher or lower than the initial price more randomly from trial to trial, and so you should NOT expect to select either UP or DOWN numerous times in a row. Noting this can allow you to perform better and increase your salary bonus.",
     font: 'Open Sans',
     pos: [0, 0.4], height: 0.03,  wrapWidth: undefined, ori: 0.0,
     languageStyle: 'LTR',
@@ -1396,9 +1426,9 @@ async function experimentInit() {
   
   // Initialize components for Routine "summary"
   summaryClock = new util.Clock();
-  score_display = new visual.TextStim({
+  final_screen = new visual.TextStim({
     win: psychoJS.window,
-    name: 'score_display',
+    name: 'final_screen',
     text: '',
     font: 'Open Sans',
     units: undefined, 
@@ -1825,6 +1855,12 @@ function objectiveRoutineBegin(snapshot) {
     objectiveComponents.push(plotLim);
     objectiveComponents.push(zeroLine);
     objectiveComponents.push(dummystock);
+    objectiveComponents.push(objective_initial_text);
+    objectiveComponents.push(objective_final_text);
+    objectiveComponents.push(objective_zeroLine_label_line);
+    objectiveComponents.push(objective_time_axis);
+    objectiveComponents.push(objective_data_box);
+    objectiveComponents.push(objective_data_text);
     objectiveComponents.push(space_bar);
     for (const thisComponent of objectiveComponents)
       if ('status' in thisComponent)
@@ -2025,15 +2061,15 @@ function objective2RoutineBegin(snapshot) {
     objective2Components = [];
     objective2Components.push(space_to_continue);
     objective2Components.push(objective2_top_text);
+    objective2Components.push(plotLim);
+    objective2Components.push(zeroLine);
+    objective2Components.push(dummystock);
     objective2Components.push(objective_initial_text);
     objective2Components.push(objective_final_text);
     objective2Components.push(objective_zeroLine_label_line);
     objective2Components.push(objective_time_axis);
     objective2Components.push(objective_data_box);
     objective2Components.push(objective_data_text);
-    objective2Components.push(plotLim);
-    objective2Components.push(zeroLine);
-    objective2Components.push(dummystock);
     objective2Components.push(space_bar);
     for (const thisComponent of objective2Components)
       if ('status' in thisComponent)
@@ -10187,6 +10223,141 @@ function presentationRoutineEnd(snapshot) {
 }
 
 
+// completion text
+function completionRoutineBegin(snapshot) {
+  return async function () {
+    TrialHandler.fromSnapshot(snapshot); // ensure that .thisN vals are up to date
+    completion_text.setText("Please copy the following completion code:\n\n" + completionCode + "\n\nThe experiment is NOT yet over.");
+    //--- Prepare to start Routine 'instructions' ---
+    t = 0;
+    completionClock.reset(); // clock
+    frameN = -1;
+    continueRoutine = true; // until we're told otherwise
+    // update component parameters for each repeat
+    space_bar.keys = undefined;
+    space_bar.rt = undefined;
+    _space_bar_allKeys = [];
+    // keep track of which components have finished
+    completionComponents = [];
+    completionComponents.push(completion_text);
+    completionComponents.push(space_to_continue);
+    completionComponents.push(space_bar);
+    
+    for (const thisComponent of completionComponents)
+      if ('status' in thisComponent)
+        thisComponent.status = PsychoJS.Status.NOT_STARTED;
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+function completionRoutineEachFrame() {
+  return async function () {
+    //--- Loop for each frame of Routine 'instructions' ---
+    // get current time
+    t = completionClock.getTime();
+    frameN = frameN + 1;// number of completed frames (so 0 is the first frame)
+    // update/draw components on each frame
+    
+    // *text* updates
+    if (t >= 0.0 && completion_text.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      completion_text.tStart = t;  // (not accounting for frame time here)
+      completion_text.frameNStart = frameN;  // exact frame index
+      completion_text.setAutoDraw(true);
+    }
+
+    // *text* updates
+    if (t >= 0.0 && space_to_continue.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      space_to_continue.tStart = t;  // (not accounting for frame time here)
+      space_to_continue.frameNStart = frameN;  // exact frame index
+      space_to_continue.setAutoDraw(true);
+    }
+
+    
+    // *space_bar* updates
+    if (t >= 0.0 && space_bar.status === PsychoJS.Status.NOT_STARTED) {
+      // keep track of start time/frame for later
+      space_bar.tStart = t;  // (not accounting for frame time here)
+      space_bar.frameNStart = frameN;  // exact frame index
+      
+      // keyboard checking is just starting
+      psychoJS.window.callOnFlip(function() { space_bar.clock.reset(); });  // t=0 on next screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.start(); }); // start on screen flip
+      psychoJS.window.callOnFlip(function() { space_bar.clearEvents(); });
+    }
+
+    if (space_bar.status === PsychoJS.Status.STARTED) {
+      let theseKeys = space_bar.getKeys({keyList: ['space'], waitRelease: false});
+      _space_bar_allKeys = _space_bar_allKeys.concat(theseKeys);
+      if (_space_bar_allKeys.length > 0) {
+        space_bar.keys = _space_bar_allKeys[_space_bar_allKeys.length - 1].name;  // just the last key pressed
+        space_bar.rt = _space_bar_allKeys[_space_bar_allKeys.length - 1].rt;
+        // a response ends the routine
+        continueRoutine = false;
+      }
+    }
+    
+    // check for quit (typically the Esc key)
+    if (psychoJS.experiment.experimentEnded || psychoJS.eventManager.getKeys({keyList:['escape']}).length > 0) {
+      return quitPsychoJS('The [Escape] key was pressed. Goodbye!', false);
+    }
+    
+    // check if the Routine should terminate
+    if (!continueRoutine) {  // a component has requested a forced-end of Routine
+      return Scheduler.Event.NEXT;
+    }
+    
+    continueRoutine = false;  // reverts to True if at least one component still running
+    for (const thisComponent of completionComponents)
+      if ('status' in thisComponent && thisComponent.status !== PsychoJS.Status.FINISHED) {
+        continueRoutine = true;
+        break;
+      }
+    
+    // refresh the screen if continuing
+    if (continueRoutine) {
+      return Scheduler.Event.FLIP_REPEAT;
+    } else {
+      return Scheduler.Event.NEXT;
+    }
+  };
+}
+
+
+function completionRoutineEnd(snapshot) {
+  return async function () {
+    //--- Ending Routine 'instructions' ---
+    for (const thisComponent of completionComponents) {
+      if (typeof thisComponent.setAutoDraw === 'function') {
+        thisComponent.setAutoDraw(false);
+      }
+    }
+    // update the trial handler
+    if (currentLoop instanceof MultiStairHandler) {
+      currentLoop.addResponse(space_bar.corr, level);
+    }
+    psychoJS.experiment.addData('space_bar.keys', space_bar.keys);
+    if (typeof space_bar.keys !== 'undefined') {  // we had a response
+        psychoJS.experiment.addData('space_bar.rt', space_bar.rt);
+        routineTimer.reset();
+        }
+    
+    space_bar.stop();
+    // the Routine "instructions" was not non-slip safe, so reset the non-slip timer
+    routineTimer.reset();
+    
+    // Routines running outside a loop should always advance the datafile row
+    if (currentLoop === psychoJS.experiment) {
+      psychoJS.experiment.nextEntry(snapshot);
+    }
+    return Scheduler.Event.NEXT;
+  }
+}
+
+
+
 var score;
 var summaryComponents;
 function summaryRoutineBegin(snapshot) {
@@ -10203,10 +10374,10 @@ function summaryRoutineBegin(snapshot) {
     // Run 'Begin Routine' code from code
     score = ("Total: " + score.toString());
     
-    score_display.setText(score + "\n\nThank you for participating in this study. The completion code is C1NJP8LA.\n\nYour submission will be manually accepted, and if you exceeded the benchmark, you will receive a bonus shortly. Have a nice day!");
+    final_screen.setText(score + "\n\nThank you for participating in this study. Your submission will be manually accepted.\n\nIf you exceeded the benchmark, you will receive a bonus shortly. Have a nice day!");
     // keep track of which components have finished
     summaryComponents = [];
-    summaryComponents.push(score_display);
+    summaryComponents.push(final_screen);
     
     for (const thisComponent of summaryComponents)
       if ('status' in thisComponent)
@@ -10224,32 +10395,18 @@ function summaryRoutineEachFrame() {
     frameN = frameN + 1;// number of completed frames (so 0 is the first frame)
     // update/draw components on each frame
     
-    // *score_display* updates
-    if (t >= 0.0 && score_display.status === PsychoJS.Status.NOT_STARTED) {
+    // *final_screen* updates
+    if (t >= 0.0 && final_screen.status === PsychoJS.Status.NOT_STARTED) {
       // keep track of start time/frame for later
-      plotLim.setAutoDraw(false);
-      zeroLine.setAutoDraw(false);
-      score_bar.setAutoDraw(false);
-      counter.setAutoDraw(false);
-      running_score.setAutoDraw(false);
-      counter_img.setAutoDraw(false);
-      running_score_img.setAutoDraw(false);
-      thresh.setAutoDraw(false);
-      thresh_text.setAutoDraw(false);
-      conditions.setAutoDraw(false);
-      eps_level.setAutoDraw(false);
-      eps_dot.setAutoDraw(false);
-      high.setAutoDraw(false);
-      low.setAutoDraw(false);
-      score_display.tStart = t;  // (not accounting for frame time here)
-      score_display.frameNStart = frameN;  // exact frame index
+      final_screen.tStart = t;  // (not accounting for frame time here)
+      final_screen.frameNStart = frameN;  // exact frame index
       
-      score_display.setAutoDraw(true);
+      final_screen.setAutoDraw(true);
     }
 
-    frameRemains = 0.0 + 60 - psychoJS.window.monitorFramePeriod * 0.75;  // most of one frame period left
-    if (score_display.status === PsychoJS.Status.STARTED && t >= frameRemains) {
-      score_display.setAutoDraw(false);
+    frameRemains = 0.0 + 30; // - psychoJS.window.monitorFramePeriod * 0.75;  // most of one frame period left
+    if (final_screen.status === PsychoJS.Status.STARTED && t >= frameRemains) {
+      final_screen.setAutoDraw(false);
     }
     // check for quit (typically the Esc key)
     if (psychoJS.experiment.experimentEnded || psychoJS.eventManager.getKeys({keyList:['escape']}).length > 0) {
