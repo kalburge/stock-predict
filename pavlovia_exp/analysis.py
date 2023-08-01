@@ -23,7 +23,7 @@ def get_files_in_directory(directory):
             files.append(f)
     return files
 
-def load(filepath, thresh, show=False):
+def load(filepath, thresh, showBonus=False):
     df = pd.read_csv(filepath)
     participant_ID = 0
     if 'PROLIFIC_PID' in df.columns:
@@ -41,6 +41,7 @@ def load(filepath, thresh, show=False):
         if 'train.thisRepN' in df.columns:
             df.drop(columns=['train.thisRepN', 'train.thisTrialN', 'train.thisN', 
             'train.thisIndex', 'train.ran'], inplace=True)
+    lengthExp = np.sum(df['resp.rt'])
     # drop unused columns
     df.dropna(how='all', inplace=True)
     # drop training round
@@ -52,10 +53,10 @@ def load(filepath, thresh, show=False):
     df["dPrice_dt"] = np.diff(df['price'], prepend=0)
     overall_acc = accuracy(df)
     # print result
-    if show:
+    if showBonus:
         if compute_bonus(df, thresh) != 0:
             print(str(participant_ID) + ',' + str(compute_bonus(df, thresh)))
-    return participant_ID, df, overall_acc
+    return participant_ID, df, overall_acc, lengthExp
 
 def convert_to_bursty(choice, idx):
     '''Converts simulated choice data structure into a data structure of time lags (amount of time since last
@@ -166,7 +167,7 @@ def get_linear_fit(x,y):
     if r2 < 0.5:
         linestyle = 'dotted'
     if p < 0.05:
-        color = 'cyan'
+        color = 'red'
     inp = np.linspace(np.min(x), np.max(x), 8)
     outp = slope*inp + intercept
     inp = inp.reshape(-1,1); outp = outp.reshape(-1,1)
