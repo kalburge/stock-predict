@@ -16,7 +16,7 @@ arm3_q: https://run.pavlovia.org/jigold/arm3_q_v2
 
 ## Value functions
 
-Instead of only $p_{0,+}^{i+1}, p_{0,+-}^{i+1}$, we also have $p_{0,0}^{i+1}$ (the initial state likelihood given that I received no reward)
+In addition to $p_{0,+}^{i+1}, p_{0,+-}^{i+1}$, we also have $p_{0,0}^{i+1}$ (the initial state likelihood given that I received no reward)
 
 $$\begin{align*}
     V_+(p_n^i;N) & = q[p_n^i\{R_c + V(p_{0,+}^{i+1};N-n-1)\} \\
