@@ -199,6 +199,18 @@ def get_sin_fit(x,y):
     inp = inp.reshape(-1,1); outp = outp.reshape(-1,1)
     return inp, outp, linestyle, color
 
+
+def get_RT(data, d=0):
+    q = []; eps = []; mean_rt = []
+    for i in range(1,numBlocks+1):
+        curBlock = block(i,data,d)
+        mean_rt.append(np.mean(curBlock['resp.rt']))
+      
+    mean_rt = np.array(mean_rt); mean_rt = mean_rt.reshape(-1,1)
+    
+    return mean_rt
+
+
     
 def get_threshold(data, d=0):
     q = []; eps = []; up_price = []; down_price = []; change_up = []; change_down = []
